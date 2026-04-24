@@ -1,4 +1,4 @@
-.PHONY: dev dev-down build migrate-up migrate-down test test-unit test-integration lint tidy scaffold
+.PHONY: dev dev-down build migrate-up migrate-down test test-unit test-integration lint tidy feature
 
 DB_URL=postgres://postgres:postgres@localhost:5432/go_boilerplate?sslmode=disable
 
@@ -33,6 +33,6 @@ lint:
 tidy:
 	go mod tidy
 
-scaffold:
-	@if [ -z "$(name)" ]; then echo "Usage: make scaffold name=<feature-name>"; exit 1; fi
+feature:
+	@if [ -z "$(name)" ]; then echo "Usage: make feature name=<feature-name>"; exit 1; fi
 	go run ./cmd/scaffold/main.go $(name)
