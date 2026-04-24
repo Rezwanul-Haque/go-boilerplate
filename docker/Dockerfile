@@ -8,17 +8,19 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/main.go
 
-FROM alpine:3.19
+FROM scratch AS final
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# CA certs for TLS (postgres SSL, any outbound HTTPS)
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
 
 COPY --from=builder /app/server .
 COPY --from=builder /app/app/infra/database/migrations ./app/infra/database/migrations
 
-USER appuser
+# Run as non-root (numeric UID — scratch has no /etc/passwd)
+USER 10001:10001
 
 EXPOSE 8080
 
-CMD ["./server"]
+CMD ["/app/server"]

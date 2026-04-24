@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# Docs
+README.md
+docs/
+
+# IDE
+.idea/
+.vscode/
+
+# Local env
+.env
+*.env.local
+
+# Binaries
+bin/
+
+# Test files
+*_test.go
+
+# OS
+.DS_Store
+Thumbs.db
