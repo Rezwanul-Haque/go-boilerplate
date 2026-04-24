@@ -1,7 +1,428 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"text/template"
+	"unicode"
+)
+
+type featureData struct {
+	Name       string // e.g. "products"
+	NameTitle  string // e.g. "Products"
+	NameSingle string // e.g. "Product"
+	PkgDB      string // e.g. "productsdb"
+}
 
 func main() {
-	fmt.Println("scaffold: not yet implemented")
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: scaffold <feature-name>")
+		fmt.Fprintln(os.Stderr, "example: make scaffold name=products")
+		os.Exit(1)
+	}
+
+	name := strings.ToLower(strings.TrimSpace(os.Args[1]))
+	if name == "" {
+		fmt.Fprintln(os.Stderr, "feature name cannot be empty")
+		os.Exit(1)
+	}
+
+	data := featureData{
+		Name:       name,
+		NameTitle:  title(name),
+		NameSingle: singular(title(name)),
+		PkgDB:      name + "db",
+	}
+
+	featureDir := filepath.Join("app", "features", name)
+	dbDir := filepath.Join("app", "infra", "database", name)
+
+	files := []struct {
+		path    string
+		content string
+	}{
+		{filepath.Join(featureDir, "model.go"), modelTpl},
+		{filepath.Join(featureDir, "errors.go"), errorsTpl},
+		{filepath.Join(featureDir, "repository.go"), repositoryTpl},
+		{filepath.Join(featureDir, "dto.go"), dtoTpl},
+		{filepath.Join(featureDir, "service.go"), serviceTpl},
+		{filepath.Join(featureDir, "handler.go"), handlerTpl},
+		{filepath.Join(featureDir, "routes.go"), routesTpl},
+		{filepath.Join(dbDir, "pg_repository.go"), pgRepositoryTpl},
+	}
+
+	for _, f := range files {
+		if err := writeTemplate(f.path, f.content, data); err != nil {
+			fmt.Fprintf(os.Stderr, "error writing %s: %v\n", f.path, err)
+			os.Exit(1)
+		}
+		fmt.Printf("  created  %s\n", f.path)
+	}
+
+	fmt.Printf("\n✓ Feature '%s' scaffolded successfully.\n\n", name)
+	fmt.Println("Next steps:")
+	fmt.Printf("  1. Register routes in app/bootstrap/routes.go:\n")
+	fmt.Printf("       %sFeature.RegisterRoutes(v1.Group(\"/%s\"), %sHandler, tokenMaker, ...)\n", name, name, name)
+	fmt.Printf("  2. Wire repo/svc/handler in cmd/main.go:\n")
+	fmt.Printf("       %sRepo := %sdb.NewPgRepository(db)\n", name, name)
+	fmt.Printf("       %sSvc  := %s.NewService(%sRepo, ...)\n", name, name, name)
+	fmt.Printf("       %sHandler := %s.NewHandler(%sSvc)\n", name, name, name)
+	fmt.Printf("  3. Add migration: app/infra/database/migrations/000002_create_%s.up.sql\n", name)
 }
+
+func writeTemplate(path, tpl string, data featureData) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("file already exists: %s", path)
+	}
+
+	t, err := template.New("").Parse(tpl)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return t.Execute(f, data)
+}
+
+func title(s string) string {
+	if s == "" {
+		return s
+	}
+	runes := []rune(s)
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
+}
+
+// singular strips a trailing 's' for common plural → singular conversion.
+// Good enough for scaffold naming (products→Product, users→User).
+// Complex cases (categories→Category) need manual rename.
+func singular(s string) string {
+	if strings.HasSuffix(s, "ies") {
+		return s[:len(s)-3] + "y"
+	}
+	if strings.HasSuffix(s, "s") && len(s) > 1 {
+		return s[:len(s)-1]
+	}
+	return s
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+const modelTpl = `package {{.Name}}
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type {{.NameSingle}} struct {
+	ID        uuid.UUID ` + "`" + `json:"id"` + "`" + `
+	CreatedAt time.Time ` + "`" + `json:"created_at"` + "`" + `
+	UpdatedAt time.Time ` + "`" + `json:"updated_at"` + "`" + `
+}
+`
+
+const errorsTpl = `package {{.Name}}
+
+import (
+	"net/http"
+
+	"go-boilerplate/app/shared/apperror"
+)
+
+var (
+	Err{{.NameSingle}}NotFound = apperror.New(http.StatusNotFound, "{{.Name}} not found")
+	Err{{.NameSingle}}Conflict = apperror.New(http.StatusConflict, "{{.Name}} already exists")
+)
+`
+
+const repositoryTpl = `package {{.Name}}
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
+
+type Repository interface {
+	Create(ctx context.Context, item *{{.NameSingle}}) error
+	FindByID(ctx context.Context, id uuid.UUID) (*{{.NameSingle}}, error)
+	Update(ctx context.Context, item *{{.NameSingle}}) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	List(ctx context.Context) ([]*{{.NameSingle}}, error)
+}
+`
+
+const dtoTpl = `package {{.Name}}
+
+type Create{{.NameSingle}}Request struct {
+	// TODO: add fields
+}
+
+type Update{{.NameSingle}}Request struct {
+	// TODO: add fields
+}
+
+type {{.NameSingle}}Response struct {
+	ID string ` + "`" + `json:"id"` + "`" + `
+	// TODO: add fields
+}
+`
+
+const serviceTpl = `package {{.Name}}
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type Service interface {
+	Create(ctx context.Context, req Create{{.NameSingle}}Request) (*{{.NameSingle}}Response, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*{{.NameSingle}}Response, error)
+	Update(ctx context.Context, id uuid.UUID, req Update{{.NameSingle}}Request) (*{{.NameSingle}}Response, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	List(ctx context.Context) ([]*{{.NameSingle}}Response, error)
+}
+
+type service struct {
+	repo Repository
+}
+
+func NewService(repo Repository) Service {
+	return &service{repo: repo}
+}
+
+func (s *service) Create(ctx context.Context, req Create{{.NameSingle}}Request) (*{{.NameSingle}}Response, error) {
+	item := &{{.NameSingle}}{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := s.repo.Create(ctx, item); err != nil {
+		return nil, err
+	}
+	return toResponse(item), nil
+}
+
+func (s *service) GetByID(ctx context.Context, id uuid.UUID) (*{{.NameSingle}}Response, error) {
+	item, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return toResponse(item), nil
+}
+
+func (s *service) Update(ctx context.Context, id uuid.UUID, req Update{{.NameSingle}}Request) (*{{.NameSingle}}Response, error) {
+	item, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	item.UpdatedAt = time.Now()
+	if err := s.repo.Update(ctx, item); err != nil {
+		return nil, err
+	}
+	return toResponse(item), nil
+}
+
+func (s *service) Delete(ctx context.Context, id uuid.UUID) error {
+	return s.repo.Delete(ctx, id)
+}
+
+func (s *service) List(ctx context.Context) ([]*{{.NameSingle}}Response, error) {
+	items, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*{{.NameSingle}}Response, len(items))
+	for i, item := range items {
+		result[i] = toResponse(item)
+	}
+	return result, nil
+}
+
+func toResponse(item *{{.NameSingle}}) *{{.NameSingle}}Response {
+	return &{{.NameSingle}}Response{
+		ID: item.ID.String(),
+	}
+}
+`
+
+const handlerTpl = `package {{.Name}}
+
+import (
+	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
+	"go-boilerplate/app/shared/response"
+)
+
+type Handler struct {
+	svc Service
+}
+
+func NewHandler(svc Service) *Handler {
+	return &Handler{svc: svc}
+}
+
+func (h *Handler) Create(c echo.Context) error {
+	var req Create{{.NameSingle}}Request
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return response.Error(c, err)
+	}
+	resp, err := h.svc.Create(c.Request().Context(), req)
+	if err != nil {
+		return response.Error(c, err)
+	}
+	return response.Created(c, resp)
+}
+
+func (h *Handler) GetByID(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return response.Error(c, err)
+	}
+	resp, err := h.svc.GetByID(c.Request().Context(), id)
+	if err != nil {
+		return response.Error(c, err)
+	}
+	return response.OK(c, resp)
+}
+
+func (h *Handler) Update(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return response.Error(c, err)
+	}
+	var req Update{{.NameSingle}}Request
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, err)
+	}
+	if err := c.Validate(&req); err != nil {
+		return response.Error(c, err)
+	}
+	resp, err := h.svc.Update(c.Request().Context(), id, req)
+	if err != nil {
+		return response.Error(c, err)
+	}
+	return response.OK(c, resp)
+}
+
+func (h *Handler) Delete(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return response.Error(c, err)
+	}
+	if err := h.svc.Delete(c.Request().Context(), id); err != nil {
+		return response.Error(c, err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) List(c echo.Context) error {
+	resp, err := h.svc.List(c.Request().Context())
+	if err != nil {
+		return response.Error(c, err)
+	}
+	return response.OK(c, resp)
+}
+`
+
+const routesTpl = `package {{.Name}}
+
+import "github.com/labstack/echo/v4"
+
+func RegisterRoutes(g *echo.Group, h *Handler) {
+	g.POST("", h.Create)
+	g.GET("/:id", h.GetByID)
+	g.PUT("/:id", h.Update)
+	g.DELETE("/:id", h.Delete)
+	g.GET("", h.List)
+}
+`
+
+const pgRepositoryTpl = `package {{.PkgDB}}
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+
+	"github.com/google/uuid"
+
+	feat "go-boilerplate/app/features/{{.Name}}"
+)
+
+type pgRepository struct {
+	db *sql.DB
+}
+
+func NewPgRepository(db *sql.DB) feat.Repository {
+	return &pgRepository{db: db}
+}
+
+func (r *pgRepository) Create(ctx context.Context, item *feat.{{.NameSingle}}) error {
+	const q = ` + "`" + `INSERT INTO {{.Name}} (id, created_at, updated_at) VALUES ($1, $2, $3)` + "`" + `
+	_, err := r.db.ExecContext(ctx, q, item.ID, item.CreatedAt, item.UpdatedAt)
+	return err
+}
+
+func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*feat.{{.NameSingle}}, error) {
+	const q = ` + "`" + `SELECT id, created_at, updated_at FROM {{.Name}} WHERE id = $1` + "`" + `
+	item := &feat.{{.NameSingle}}{}
+	err := r.db.QueryRowContext(ctx, q, id).Scan(&item.ID, &item.CreatedAt, &item.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, feat.Err{{.NameSingle}}NotFound
+	}
+	return item, err
+}
+
+func (r *pgRepository) Update(ctx context.Context, item *feat.{{.NameSingle}}) error {
+	const q = ` + "`" + `UPDATE {{.Name}} SET updated_at = $1 WHERE id = $2` + "`" + `
+	_, err := r.db.ExecContext(ctx, q, item.UpdatedAt, item.ID)
+	return err
+}
+
+func (r *pgRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	const q = ` + "`" + `DELETE FROM {{.Name}} WHERE id = $1` + "`" + `
+	_, err := r.db.ExecContext(ctx, q, id)
+	return err
+}
+
+func (r *pgRepository) List(ctx context.Context) ([]*feat.{{.NameSingle}}, error) {
+	const q = ` + "`" + `SELECT id, created_at, updated_at FROM {{.Name}} ORDER BY created_at DESC` + "`" + `
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []*feat.{{.NameSingle}}
+	for rows.Next() {
+		item := &feat.{{.NameSingle}}{}
+		if err := rows.Scan(&item.ID, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+`
