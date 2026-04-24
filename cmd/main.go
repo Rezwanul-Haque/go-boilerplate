@@ -23,6 +23,7 @@ import (
 	"go-boilerplate/app/infra/notification"
 	"go-boilerplate/app/shared/config"
 	"go-boilerplate/app/shared/token"
+	// scaffold:main-imports
 )
 
 func main() {
@@ -49,6 +50,7 @@ func main() {
 	usersRepo := dbUsers.NewPgRepository(db)
 	usersSvc := usersFeature.NewService(usersRepo, usersRepo, notifier, tokenMaker)
 	usersHandler := usersFeature.NewHandler(usersSvc)
+	// scaffold:feature-wire
 
 	hashFn := func(ctx context.Context, userID uuid.UUID) (string, error) {
 		user, err := usersRepo.FindByID(ctx, userID)
@@ -59,7 +61,7 @@ func main() {
 	}
 
 	e := bootstrap.NewEcho(log)
-	bootstrap.RegisterRoutes(e, usersHandler, tokenMaker, hashFn)
+	bootstrap.RegisterRoutes(e, usersHandler, tokenMaker, hashFn /* scaffold:feature-call */)
 
 	go func() {
 		addr := fmt.Sprintf(":%s", cfg.AppPort)

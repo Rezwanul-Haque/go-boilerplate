@@ -19,7 +19,7 @@ type featureData struct {
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: scaffold <feature-name>")
-		fmt.Fprintln(os.Stderr, "example: make scaffold name=products")
+		fmt.Fprintln(os.Stderr, "example: make feature name=products")
 		os.Exit(1)
 	}
 
@@ -61,16 +61,106 @@ func main() {
 		fmt.Printf("  created  %s\n", f.path)
 	}
 
-	fmt.Printf("\n✓ Feature '%s' scaffolded successfully.\n\n", name)
+	if err := injectBootstrapRoutes(data); err != nil {
+		fmt.Fprintf(os.Stderr, "error updating app/bootstrap/routes.go: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("  updated  app/bootstrap/routes.go")
+
+	if err := injectMainWire(data); err != nil {
+		fmt.Fprintf(os.Stderr, "error updating cmd/main.go: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("  updated  cmd/main.go")
+
+	fmt.Printf("\n✓ Feature '%s' scaffolded and wired successfully.\n\n", name)
 	fmt.Println("Next steps:")
-	fmt.Printf("  1. Register routes in app/bootstrap/routes.go:\n")
-	fmt.Printf("       %sFeature.RegisterRoutes(v1.Group(\"/%s\"), %sHandler, tokenMaker, ...)\n", name, name, name)
-	fmt.Printf("  2. Wire repo/svc/handler in cmd/main.go:\n")
-	fmt.Printf("       %sRepo := %sdb.NewPgRepository(db)\n", name, name)
-	fmt.Printf("       %sSvc  := %s.NewService(%sRepo, ...)\n", name, name, name)
-	fmt.Printf("       %sHandler := %s.NewHandler(%sSvc)\n", name, name, name)
-	fmt.Printf("  3. Add migration: app/infra/database/migrations/000002_create_%s.up.sql\n", name)
+	fmt.Printf("  1. Add migration: app/infra/database/migrations/000002_create_%s.up.sql\n", name)
+	fmt.Printf("  2. Add domain fields to app/features/%s/model.go\n", name)
+	fmt.Printf("  3. Add DTOs to app/features/%s/dto.go\n", name)
+	fmt.Printf("  4. Implement queries in app/infra/database/%s/pg_repository.go\n", name)
 }
+
+// ---------------------------------------------------------------------------
+// Injection helpers
+// ---------------------------------------------------------------------------
+
+func injectBootstrapRoutes(data featureData) error {
+	return modifyFile("app/bootstrap/routes.go", func(content string) (string, error) {
+		var err error
+
+		importLine := fmt.Sprintf("\t%sFeature \"go-boilerplate/app/features/%s\"", data.Name, data.Name)
+		if content, err = injectBefore(content, "\t// scaffold:feature-imports", importLine); err != nil {
+			return "", err
+		}
+
+		paramLine := fmt.Sprintf("\t%sHandler *%sFeature.Handler,", data.Name, data.Name)
+		if content, err = injectBefore(content, "\t// scaffold:feature-params", paramLine); err != nil {
+			return "", err
+		}
+
+		routeLine := fmt.Sprintf("\t%sFeature.RegisterRoutes(v1.Group(\"/%s\"), %sHandler)", data.Name, data.Name, data.Name)
+		if content, err = injectBefore(content, "\t// scaffold:feature-routes", routeLine); err != nil {
+			return "", err
+		}
+
+		return content, nil
+	})
+}
+
+func injectMainWire(data featureData) error {
+	return modifyFile("cmd/main.go", func(content string) (string, error) {
+		var err error
+
+		importLines := fmt.Sprintf(
+			"\t%sFeature \"go-boilerplate/app/features/%s\"\n\tdb%s \"go-boilerplate/app/infra/database/%s\"",
+			data.Name, data.Name, data.NameTitle, data.Name)
+		if content, err = injectBefore(content, "\t// scaffold:main-imports", importLines); err != nil {
+			return "", err
+		}
+
+		wireLines := fmt.Sprintf(
+			"\t%sRepo    := db%s.NewPgRepository(db)\n\t%sSvc     := %sFeature.NewService(%sRepo)\n\t%sHandler := %sFeature.NewHandler(%sSvc)",
+			data.Name, data.NameTitle,
+			data.Name, data.Name, data.Name,
+			data.Name, data.Name, data.Name)
+		if content, err = injectBefore(content, "\t// scaffold:feature-wire", wireLines); err != nil {
+			return "", err
+		}
+
+		callSentinel := "/* scaffold:feature-call */"
+		if !strings.Contains(content, callSentinel) {
+			return "", fmt.Errorf("sentinel %q not found — was it manually removed?", callSentinel)
+		}
+		callArg := fmt.Sprintf(", %sHandler /* scaffold:feature-call */", data.Name)
+		content = strings.Replace(content, callSentinel, callArg, 1)
+
+		return content, nil
+	})
+}
+
+func modifyFile(path string, transform func(string) (string, error)) error {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	result, err := transform(string(b))
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(result), 0644)
+}
+
+func injectBefore(content, marker, injection string) (string, error) {
+	if !strings.Contains(content, marker) {
+		return "", fmt.Errorf("sentinel %q not found — was it manually removed?", marker)
+	}
+	return strings.Replace(content, marker, injection+"\n"+marker, 1), nil
+}
+
+// ---------------------------------------------------------------------------
+// File generation helpers
+// ---------------------------------------------------------------------------
 
 func writeTemplate(path, tpl string, data featureData) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
