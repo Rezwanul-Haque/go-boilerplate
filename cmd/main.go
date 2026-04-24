@@ -42,7 +42,9 @@ func main() {
 	}
 	defer db.Close()
 
-	runMigrations(db)
+	if cfg.RunMigrations {
+		runMigrations(db)
+	}
 
 	tokenMaker := token.NewJWTMaker(cfg.JWTSecret)
 	notifier := notification.NewMockNotifier()

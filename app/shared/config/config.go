@@ -9,17 +9,18 @@ import (
 )
 
 type Config struct {
-	AppPort    string
-	DBHost     string
-	DBPort     string
-	DBUser     string
-	DBPassword string
-	DBName     string
-	DBSSLMode  string
-	JWTSecret  string
-	AccessTTL  int
-	RefreshTTL int
-	LogLevel   string
+	AppPort       string
+	DBHost        string
+	DBPort        string
+	DBUser        string
+	DBPassword    string
+	DBName        string
+	DBSSLMode     string
+	JWTSecret     string
+	AccessTTL     int
+	RefreshTTL    int
+	LogLevel      string
+	RunMigrations bool
 }
 
 func Load() (*Config, error) {
@@ -36,7 +37,8 @@ func Load() (*Config, error) {
 		JWTSecret:  getEnv("JWT_SECRET", "changeme"),
 		AccessTTL:  getEnvInt("JWT_ACCESS_TTL_MINUTES", 15),
 		RefreshTTL: getEnvInt("JWT_REFRESH_TTL_DAYS", 7),
-		LogLevel:   getEnv("LOG_LEVEL", "info"),
+		LogLevel:      getEnv("LOG_LEVEL", "info"),
+		RunMigrations: getEnvBool("RUN_MIGRATIONS", false),
 	}, nil
 }
 
@@ -58,6 +60,15 @@ func getEnvInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			return i
+		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
 		}
 	}
 	return fallback

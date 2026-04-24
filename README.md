@@ -124,6 +124,7 @@ go run ./cmd/main.go
 | `JWT_ACCESS_TTL_MINUTES` | `15` | Access token TTL |
 | `JWT_REFRESH_TTL_DAYS` | `7` | Refresh token TTL |
 | `LOG_LEVEL` | `info` | zerolog level (debug/info/warn/error) |
+| `RUN_MIGRATIONS` | `false` | Run DB migrations on startup (`true`/`false`) |
 
 ---
 

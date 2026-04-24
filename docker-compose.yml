@@ -19,6 +19,7 @@ services:
       JWT_ACCESS_TTL_MINUTES: "15"
       JWT_REFRESH_TTL_DAYS: "7"
       LOG_LEVEL: info
+      RUN_MIGRATIONS: "true"
     depends_on:
       postgres:
         condition: service_healthy
