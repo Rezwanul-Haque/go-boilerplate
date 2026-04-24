@@ -44,14 +44,22 @@ func main() {
 	e := bootstrap.NewEcho(log)
 	bootstrap.RegisterRoutes(e, c)
 
+	addr := fmt.Sprintf(":%s", cfg.AppPort)
+	log.Info("server starting", "addr", addr)
 	go func() {
-		addr := fmt.Sprintf(":%s", cfg.AppPort)
-		log.Info("server starting", "addr", addr)
 		if err := e.Start(addr); err != nil {
 			log.Info("server stopped")
 		}
 	}()
 
+	gracefulShutdown(e, log)
+}
+
+func gracefulShutdown(e interface {
+	Shutdown(ctx context.Context) error
+}, log interface {
+	Error(msg string, err error, fields ...any)
+}) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
