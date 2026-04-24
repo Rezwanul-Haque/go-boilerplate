@@ -16,6 +16,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"go-boilerplate/app/bootstrap"
+	"go-boilerplate/app/features/health"
 	usersFeature "go-boilerplate/app/features/users"
 	"go-boilerplate/app/infra/database"
 	dbUsers "go-boilerplate/app/infra/database/users"
@@ -49,6 +50,8 @@ func main() {
 	tokenMaker := token.NewJWTMaker(cfg.JWTSecret)
 	notifier := notification.NewMockNotifier()
 
+	healthHandler := health.NewHandler(db)
+
 	usersRepo := dbUsers.NewPgRepository(db)
 	usersSvc := usersFeature.NewService(usersRepo, usersRepo, notifier, tokenMaker)
 	usersHandler := usersFeature.NewHandler(usersSvc)
@@ -63,7 +66,7 @@ func main() {
 	}
 
 	e := bootstrap.NewEcho(log)
-	bootstrap.RegisterRoutes(e, usersHandler, tokenMaker, hashFn /* scaffold:feature-call */)
+	bootstrap.RegisterRoutes(e, healthHandler, usersHandler, tokenMaker, hashFn /* scaffold:feature-call */)
 
 	go func() {
 		addr := fmt.Sprintf(":%s", cfg.AppPort)
