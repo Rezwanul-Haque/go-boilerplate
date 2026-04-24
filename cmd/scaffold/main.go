@@ -61,29 +61,63 @@ func main() {
 		fmt.Printf("  created  %s\n", f.path)
 	}
 
+	if err := injectContainer(data); err != nil {
+		fmt.Fprintf(os.Stderr, "error updating app/bootstrap/container.go: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("  updated  app/bootstrap/container.go")
+
 	if err := injectBootstrapRoutes(data); err != nil {
 		fmt.Fprintf(os.Stderr, "error updating app/bootstrap/routes.go: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("  updated  app/bootstrap/routes.go")
 
-	if err := injectMainWire(data); err != nil {
-		fmt.Fprintf(os.Stderr, "error updating cmd/main.go: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("  updated  cmd/main.go")
-
 	fmt.Printf("\n✓ Feature '%s' scaffolded and wired successfully.\n\n", name)
 	fmt.Println("Next steps:")
-	fmt.Printf("  1. Add migration: app/infra/database/migrations/000002_create_%s.up.sql\n", name)
-	fmt.Printf("  2. Add domain fields to app/features/%s/model.go\n", name)
-	fmt.Printf("  3. Add DTOs to app/features/%s/dto.go\n", name)
-	fmt.Printf("  4. Implement queries in app/infra/database/%s/pg_repository.go\n", name)
+	fmt.Printf("  1. Add migration:  app/infra/database/migrations/XXXXXX_create_%s.up.sql\n", name)
+	fmt.Printf("  2. Fill model:     app/features/%s/model.go\n", name)
+	fmt.Printf("  3. Fill DTOs:      app/features/%s/dto.go\n", name)
+	fmt.Printf("  4. Fill repo:      app/infra/database/%s/pg_repository.go\n", name)
 }
 
 // ---------------------------------------------------------------------------
 // Injection helpers
 // ---------------------------------------------------------------------------
+
+func injectContainer(data featureData) error {
+	return modifyFile("app/bootstrap/container.go", func(content string) (string, error) {
+		var err error
+
+		importLines := fmt.Sprintf(
+			"\t%sFeature \"go-boilerplate/app/features/%s\"\n\tdb%s \"go-boilerplate/app/infra/database/%s\"",
+			data.Name, data.Name, data.NameTitle, data.Name)
+		if content, err = injectBefore(content, "\t// scaffold:container-imports", importLines); err != nil {
+			return "", err
+		}
+
+		fieldLine := fmt.Sprintf("\t%sHandler *%sFeature.Handler", data.NameTitle, data.Name)
+		if content, err = injectBefore(content, "\t// scaffold:container-fields", fieldLine); err != nil {
+			return "", err
+		}
+
+		wireLines := fmt.Sprintf(
+			"\t%sRepo    := db%s.NewPgRepository(db)\n\t%sSvc     := %sFeature.NewService(%sRepo)\n\t%sHandler := %sFeature.NewHandler(%sSvc)",
+			data.Name, data.NameTitle,
+			data.Name, data.Name, data.Name,
+			data.Name, data.Name, data.Name)
+		if content, err = injectBefore(content, "\t// scaffold:container-wire", wireLines); err != nil {
+			return "", err
+		}
+
+		initLine := fmt.Sprintf("\t\t%sHandler: %sHandler,", data.NameTitle, data.Name)
+		if content, err = injectBefore(content, "\t\t// scaffold:container-init", initLine); err != nil {
+			return "", err
+		}
+
+		return content, nil
+	})
+}
 
 func injectBootstrapRoutes(data featureData) error {
 	return modifyFile("app/bootstrap/routes.go", func(content string) (string, error) {
@@ -94,46 +128,10 @@ func injectBootstrapRoutes(data featureData) error {
 			return "", err
 		}
 
-		paramLine := fmt.Sprintf("\t%sHandler *%sFeature.Handler,", data.Name, data.Name)
-		if content, err = injectBefore(content, "\t// scaffold:feature-params", paramLine); err != nil {
-			return "", err
-		}
-
-		routeLine := fmt.Sprintf("\t%sFeature.RegisterRoutes(v1.Group(\"/%s\"), %sHandler)", data.Name, data.Name, data.Name)
+		routeLine := fmt.Sprintf("\t%sFeature.RegisterRoutes(v1.Group(\"/%s\"), c.%sHandler)", data.Name, data.Name, data.NameTitle)
 		if content, err = injectBefore(content, "\t// scaffold:feature-routes", routeLine); err != nil {
 			return "", err
 		}
-
-		return content, nil
-	})
-}
-
-func injectMainWire(data featureData) error {
-	return modifyFile("cmd/main.go", func(content string) (string, error) {
-		var err error
-
-		importLines := fmt.Sprintf(
-			"\t%sFeature \"go-boilerplate/app/features/%s\"\n\tdb%s \"go-boilerplate/app/infra/database/%s\"",
-			data.Name, data.Name, data.NameTitle, data.Name)
-		if content, err = injectBefore(content, "\t// scaffold:main-imports", importLines); err != nil {
-			return "", err
-		}
-
-		wireLines := fmt.Sprintf(
-			"\t%sRepo    := db%s.NewPgRepository(db)\n\t%sSvc     := %sFeature.NewService(%sRepo)\n\t%sHandler := %sFeature.NewHandler(%sSvc)",
-			data.Name, data.NameTitle,
-			data.Name, data.Name, data.Name,
-			data.Name, data.Name, data.Name)
-		if content, err = injectBefore(content, "\t// scaffold:feature-wire", wireLines); err != nil {
-			return "", err
-		}
-
-		callSentinel := "/* scaffold:feature-call */"
-		if !strings.Contains(content, callSentinel) {
-			return "", fmt.Errorf("sentinel %q not found — was it manually removed?", callSentinel)
-		}
-		callArg := fmt.Sprintf(", %sHandler /* scaffold:feature-call */", data.Name)
-		content = strings.Replace(content, callSentinel, callArg, 1)
 
 		return content, nil
 	})

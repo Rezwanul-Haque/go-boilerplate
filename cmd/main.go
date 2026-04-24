@@ -12,19 +12,12 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	migratePostgres "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"go-boilerplate/app/bootstrap"
-	"go-boilerplate/app/features/health"
-	usersFeature "go-boilerplate/app/features/users"
 	"go-boilerplate/app/infra/database"
-	dbUsers "go-boilerplate/app/infra/database/users"
 	"go-boilerplate/app/infra/logger"
-	"go-boilerplate/app/infra/notification"
 	"go-boilerplate/app/shared/config"
-	"go-boilerplate/app/shared/token"
-	// scaffold:main-imports
 )
 
 func main() {
@@ -47,26 +40,9 @@ func main() {
 		runMigrations(db)
 	}
 
-	tokenMaker := token.NewJWTMaker(cfg.JWTSecret)
-	notifier := notification.NewMockNotifier()
-
-	healthHandler := health.NewHandler(db)
-
-	usersRepo := dbUsers.NewPgRepository(db)
-	usersSvc := usersFeature.NewService(usersRepo, usersRepo, notifier, tokenMaker)
-	usersHandler := usersFeature.NewHandler(usersSvc)
-	// scaffold:feature-wire
-
-	hashFn := func(ctx context.Context, userID uuid.UUID) (string, error) {
-		user, err := usersRepo.FindByID(ctx, userID)
-		if err != nil {
-			return "", err
-		}
-		return user.PasswordHash, nil
-	}
-
+	c := bootstrap.NewContainer(db, cfg)
 	e := bootstrap.NewEcho(log)
-	bootstrap.RegisterRoutes(e, healthHandler, usersHandler, tokenMaker, hashFn /* scaffold:feature-call */)
+	bootstrap.RegisterRoutes(e, c)
 
 	go func() {
 		addr := fmt.Sprintf(":%s", cfg.AppPort)
