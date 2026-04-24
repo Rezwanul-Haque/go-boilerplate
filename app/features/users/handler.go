@@ -1,10 +1,11 @@
 package users
 
 import (
-	"github.com/labstack/echo/v4"
 	"go-boilerplate/app/shared/apperror"
 	"go-boilerplate/app/shared/response"
 	"go-boilerplate/app/shared/token"
+
+	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {

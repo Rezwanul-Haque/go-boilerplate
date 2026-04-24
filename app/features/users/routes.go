@@ -1,9 +1,10 @@
 package users
 
 import (
-	"github.com/labstack/echo/v4"
 	"go-boilerplate/app/infra/middleware"
 	"go-boilerplate/app/shared/token"
+
+	"github.com/labstack/echo/v4"
 )
 
 func RegisterRoutes(g *echo.Group, h *Handler, tokenMaker token.Maker, signupLimiter echo.MiddlewareFunc) {

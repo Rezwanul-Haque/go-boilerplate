@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"go-boilerplate/app/shared/apperror"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAppError_Error_ReturnsMessage(t *testing.T) {

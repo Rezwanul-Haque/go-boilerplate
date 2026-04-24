@@ -3,8 +3,9 @@ package middleware
 import (
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"go-boilerplate/app/shared/ports"
+
+	"github.com/labstack/echo/v4"
 )
 
 func RequestLogger(logger ports.Logger) echo.MiddlewareFunc {

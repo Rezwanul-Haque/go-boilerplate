@@ -7,11 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"go-boilerplate/app/shared/apperror"
+	"go-boilerplate/app/shared/response"
+
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go-boilerplate/app/shared/apperror"
-	"go-boilerplate/app/shared/response"
 )
 
 func newCtx(method, path string) (echo.Context, *httptest.ResponseRecorder) {

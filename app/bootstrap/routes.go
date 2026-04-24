@@ -1,11 +1,12 @@
 package bootstrap
 
 import (
-	"github.com/labstack/echo/v4"
-	"golang.org/x/time/rate"
 	usersFeature "go-boilerplate/app/features/users"
 	"go-boilerplate/app/infra/middleware"
 	"go-boilerplate/app/shared/token"
+
+	"github.com/labstack/echo/v4"
+	"golang.org/x/time/rate"
 )
 
 func RegisterRoutes(e *echo.Echo, usersHandler *usersFeature.Handler, tokenMaker token.Maker) {

@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"go-boilerplate/app/shared/token"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go-boilerplate/app/shared/token"
 )
 
 const testSecret = "supersecretkey1234567890abcdefghij"

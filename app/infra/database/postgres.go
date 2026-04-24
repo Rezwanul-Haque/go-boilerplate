@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"go-boilerplate/app/shared/config"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func NewPostgresDB(cfg *config.Config) (*sql.DB, error) {

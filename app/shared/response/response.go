@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"go-boilerplate/app/shared/apperror"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
-	"go-boilerplate/app/shared/apperror"
 )
 
 type Response struct {

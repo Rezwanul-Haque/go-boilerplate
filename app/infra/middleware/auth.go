@@ -3,10 +3,11 @@ package middleware
 import (
 	"strings"
 
-	"github.com/labstack/echo/v4"
 	"go-boilerplate/app/shared/apperror"
 	"go-boilerplate/app/shared/response"
 	"go-boilerplate/app/shared/token"
+
+	"github.com/labstack/echo/v4"
 )
 
 func Auth(maker token.Maker) echo.MiddlewareFunc {

@@ -3,9 +3,10 @@ package logger
 import (
 	"os"
 
-	"github.com/rs/zerolog"
 	"go-boilerplate/app/shared/config"
 	"go-boilerplate/app/shared/ports"
+
+	"github.com/rs/zerolog"
 )
 
 type zerologLogger struct {

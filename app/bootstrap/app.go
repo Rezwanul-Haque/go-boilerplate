@@ -1,11 +1,12 @@
 package bootstrap
 
 import (
+	"go-boilerplate/app/infra/middleware"
+	"go-boilerplate/app/shared/ports"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
-	"go-boilerplate/app/infra/middleware"
-	"go-boilerplate/app/shared/ports"
 )
 
 type customValidator struct {
