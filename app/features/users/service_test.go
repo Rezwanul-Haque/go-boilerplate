@@ -274,7 +274,7 @@ func TestRefreshToken_InvalidToken(t *testing.T) {
 
 func TestRefreshToken_AccessTokenUsedAsRefresh(t *testing.T) {
 	maker := token.NewJWTMaker(testJWTSecret)
-	accessTok, err := maker.CreateToken(uuid.New(), "r@example.com", token.AccessToken, time.Minute)
+	accessTok, err := maker.CreateToken(uuid.New(), "r@example.com", token.AccessToken, time.Minute, "")
 	require.NoError(t, err)
 
 	svc := newTestService(newMockUserRepo(), newMockResetRepo(), &mockNotifier{})

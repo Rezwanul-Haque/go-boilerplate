@@ -12,6 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	migratePostgres "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"go-boilerplate/app/bootstrap"
@@ -49,8 +50,16 @@ func main() {
 	usersSvc := usersFeature.NewService(usersRepo, usersRepo, notifier, tokenMaker)
 	usersHandler := usersFeature.NewHandler(usersSvc)
 
+	hashFn := func(ctx context.Context, userID uuid.UUID) (string, error) {
+		user, err := usersRepo.FindByID(ctx, userID)
+		if err != nil {
+			return "", err
+		}
+		return user.PasswordHash, nil
+	}
+
 	e := bootstrap.NewEcho(log)
-	bootstrap.RegisterRoutes(e, usersHandler, tokenMaker)
+	bootstrap.RegisterRoutes(e, usersHandler, tokenMaker, hashFn)
 
 	go func() {
 		addr := fmt.Sprintf(":%s", cfg.AppPort)

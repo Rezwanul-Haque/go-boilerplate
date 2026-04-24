@@ -137,7 +137,17 @@ func (s *service) ChangePassword(ctx context.Context, userID uuid.UUID, req Chan
 }
 
 func (s *service) RefreshToken(ctx context.Context, req RefreshTokenRequest) (*AuthResponse, error) {
-	claims, err := s.token.VerifyToken(req.RefreshToken)
+	unverified, err := s.token.ParseUnverifiedClaims(req.RefreshToken)
+	if err != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	user, err := s.repo.FindByID(ctx, unverified.UserID)
+	if err != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	claims, err := s.token.VerifyToken(req.RefreshToken, user.PasswordHash)
 	if err != nil {
 		return nil, ErrInvalidRefreshToken
 	}
@@ -146,21 +156,16 @@ func (s *service) RefreshToken(ctx context.Context, req RefreshTokenRequest) (*A
 		return nil, ErrInvalidRefreshToken
 	}
 
-	user, err := s.repo.FindByID(ctx, claims.UserID)
-	if err != nil {
-		return nil, ErrUserNotFound
-	}
-
 	return s.buildAuthResponse(user)
 }
 
 func (s *service) buildAuthResponse(user *User) (*AuthResponse, error) {
-	accessTok, err := s.token.CreateToken(user.ID, user.Email, token.AccessToken, 15*time.Minute)
+	accessTok, err := s.token.CreateToken(user.ID, user.Email, token.AccessToken, 15*time.Minute, user.PasswordHash)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshTok, err := s.token.CreateToken(user.ID, user.Email, token.RefreshToken, 7*24*time.Hour)
+	refreshTok, err := s.token.CreateToken(user.ID, user.Email, token.RefreshToken, 7*24*time.Hour, user.PasswordHash)
 	if err != nil {
 		return nil, err
 	}

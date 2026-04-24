@@ -25,8 +25,9 @@ type Claims struct {
 }
 
 type Maker interface {
-	CreateToken(userID uuid.UUID, email string, tokenType TokenType, ttl time.Duration) (string, error)
-	VerifyToken(tokenStr string) (*Claims, error)
+	CreateToken(userID uuid.UUID, email string, tokenType TokenType, ttl time.Duration, salt string) (string, error)
+	VerifyToken(tokenStr string, salt string) (*Claims, error)
+	ParseUnverifiedClaims(tokenStr string) (*Claims, error)
 }
 
 type jwtMaker struct {
@@ -37,7 +38,11 @@ func NewJWTMaker(secretKey string) Maker {
 	return &jwtMaker{secretKey: secretKey}
 }
 
-func (m *jwtMaker) CreateToken(userID uuid.UUID, email string, tokenType TokenType, ttl time.Duration) (string, error) {
+func (m *jwtMaker) signingKey(salt string) []byte {
+	return []byte(m.secretKey + salt)
+}
+
+func (m *jwtMaker) CreateToken(userID uuid.UUID, email string, tokenType TokenType, ttl time.Duration, salt string) (string, error) {
 	claims := &Claims{
 		UserID: userID,
 		Email:  email,
@@ -49,15 +54,15 @@ func (m *jwtMaker) CreateToken(userID uuid.UUID, email string, tokenType TokenTy
 		},
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString([]byte(m.secretKey))
+	return t.SignedString(m.signingKey(salt))
 }
 
-func (m *jwtMaker) VerifyToken(tokenStr string) (*Claims, error) {
+func (m *jwtMaker) VerifyToken(tokenStr string, salt string) (*Claims, error) {
 	t, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}
-		return []byte(m.secretKey), nil
+		return m.signingKey(salt), nil
 	})
 	if err != nil {
 		return nil, ErrInvalidToken
@@ -65,6 +70,15 @@ func (m *jwtMaker) VerifyToken(tokenStr string) (*Claims, error) {
 
 	claims, ok := t.Claims.(*Claims)
 	if !ok || !t.Valid {
+		return nil, ErrInvalidToken
+	}
+	return claims, nil
+}
+
+func (m *jwtMaker) ParseUnverifiedClaims(tokenStr string) (*Claims, error) {
+	claims := &Claims{}
+	_, _, err := jwt.NewParser().ParseUnverified(tokenStr, claims)
+	if err != nil {
 		return nil, ErrInvalidToken
 	}
 	return claims, nil

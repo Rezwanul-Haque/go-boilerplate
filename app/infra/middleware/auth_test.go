@@ -1,6 +1,7 @@
 package middleware_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,6 +17,7 @@ import (
 )
 
 const authTestSecret = "supersecretkey1234567890abcdefghij"
+const authTestSalt = "$2a$10$examplepasswordhashfortesting"
 
 func newEchoCtx(method, path, authHeader string) (echo.Context, *httptest.ResponseRecorder) {
 	e := echo.New()
@@ -27,11 +29,17 @@ func newEchoCtx(method, path, authHeader string) (echo.Context, *httptest.Respon
 	return e.NewContext(req, rec), rec
 }
 
+func fixedHashFn(hash string) func(ctx context.Context, userID uuid.UUID) (string, error) {
+	return func(_ context.Context, _ uuid.UUID) (string, error) {
+		return hash, nil
+	}
+}
+
 func TestAuthMiddleware_NoHeader_Returns401(t *testing.T) {
 	maker := token.NewJWTMaker(authTestSecret)
 	c, rec := newEchoCtx(http.MethodGet, "/", "")
 
-	handler := middleware.Auth(maker)(func(c echo.Context) error {
+	handler := middleware.Auth(maker, fixedHashFn(authTestSalt))(func(c echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 
@@ -43,7 +51,7 @@ func TestAuthMiddleware_InvalidToken_Returns401(t *testing.T) {
 	maker := token.NewJWTMaker(authTestSecret)
 	c, rec := newEchoCtx(http.MethodGet, "/", "Bearer notavalidtoken")
 
-	handler := middleware.Auth(maker)(func(c echo.Context) error {
+	handler := middleware.Auth(maker, fixedHashFn(authTestSalt))(func(c echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 
@@ -53,12 +61,12 @@ func TestAuthMiddleware_InvalidToken_Returns401(t *testing.T) {
 
 func TestAuthMiddleware_ValidToken_PassesThrough(t *testing.T) {
 	maker := token.NewJWTMaker(authTestSecret)
-	tok, err := maker.CreateToken(uuid.New(), "auth@example.com", token.AccessToken, time.Minute)
+	tok, err := maker.CreateToken(uuid.New(), "auth@example.com", token.AccessToken, time.Minute, authTestSalt)
 	require.NoError(t, err)
 
 	c, rec := newEchoCtx(http.MethodGet, "/", "Bearer "+tok)
 
-	handler := middleware.Auth(maker)(func(c echo.Context) error {
+	handler := middleware.Auth(maker, fixedHashFn(authTestSalt))(func(c echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 
@@ -70,13 +78,13 @@ func TestAuthMiddleware_ValidToken_PassesThrough(t *testing.T) {
 func TestAuthMiddleware_ValidToken_SetsClaims(t *testing.T) {
 	maker := token.NewJWTMaker(authTestSecret)
 	userID := uuid.New()
-	tok, err := maker.CreateToken(userID, "claims@example.com", token.AccessToken, time.Minute)
+	tok, err := maker.CreateToken(userID, "claims@example.com", token.AccessToken, time.Minute, authTestSalt)
 	require.NoError(t, err)
 
 	c, _ := newEchoCtx(http.MethodGet, "/", "Bearer "+tok)
 
 	var capturedClaims *token.Claims
-	handler := middleware.Auth(maker)(func(c echo.Context) error {
+	handler := middleware.Auth(maker, fixedHashFn(authTestSalt))(func(c echo.Context) error {
 		capturedClaims = c.Get("claims").(*token.Claims)
 		return c.String(http.StatusOK, "ok")
 	})
@@ -84,4 +92,19 @@ func TestAuthMiddleware_ValidToken_SetsClaims(t *testing.T) {
 	require.NoError(t, handler(c))
 	require.NotNil(t, capturedClaims)
 	assert.Equal(t, userID, capturedClaims.UserID)
+}
+
+func TestAuthMiddleware_WrongSalt_Returns401(t *testing.T) {
+	maker := token.NewJWTMaker(authTestSecret)
+	tok, err := maker.CreateToken(uuid.New(), "salt@example.com", token.AccessToken, time.Minute, authTestSalt)
+	require.NoError(t, err)
+
+	c, rec := newEchoCtx(http.MethodGet, "/", "Bearer "+tok)
+
+	handler := middleware.Auth(maker, fixedHashFn("differenthash"))(func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
+
+	_ = handler(c)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
