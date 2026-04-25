@@ -210,16 +210,11 @@ func singular(s string) string {
 
 const modelTpl = `package {{.Name}}
 
-import (
-	"time"
-
-	"github.com/google/uuid"
-)
+import "go-boilerplate/app/shared/model"
 
 type {{.NameSingle}} struct {
-	ID        uuid.UUID ` + "`" + `json:"id"` + "`" + `
-	CreatedAt time.Time ` + "`" + `json:"created_at"` + "`" + `
-	UpdatedAt time.Time ` + "`" + `json:"updated_at"` + "`" + `
+	model.Base
+	// TODO: add fields
 }
 `
 
@@ -277,6 +272,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"go-boilerplate/app/shared/model"
 )
 
 type Service interface {
@@ -297,9 +294,7 @@ func NewService(repo Repository) Service {
 
 func (s *service) Create(ctx context.Context, req Create{{.NameSingle}}Request) (*{{.NameSingle}}Response, error) {
 	item := &{{.NameSingle}}{
-		ID:        uuid.New(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Base: model.Base{ID: uuid.New(), CreatedAt: time.Now(), UpdatedAt: time.Now()},
 	}
 	if err := s.repo.Create(ctx, item); err != nil {
 		return nil, err
