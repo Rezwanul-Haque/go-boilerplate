@@ -69,6 +69,8 @@ func (m *mockCache) Exists(_ context.Context, key string) (bool, error) {
 	return ok, nil
 }
 
+func (m *mockCache) Ping(_ context.Context) error { return nil }
+
 // --- tests ---
 
 func TestGetPost_CacheMiss_FetchesUpstream(t *testing.T) {

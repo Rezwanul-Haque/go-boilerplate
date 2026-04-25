@@ -14,12 +14,17 @@ type Pinger interface {
 	PingContext(ctx context.Context) error
 }
 
-type Handler struct {
-	db Pinger
+type CachePinger interface {
+	Ping(ctx context.Context) error
 }
 
-func NewHandler(db Pinger) *Handler {
-	return &Handler{db: db}
+type Handler struct {
+	db    Pinger
+	cache CachePinger
+}
+
+func NewHandler(db Pinger, cache CachePinger) *Handler {
+	return &Handler{db: db, cache: cache}
 }
 
 type Status struct {
@@ -47,6 +52,17 @@ func (h *Handler) Check(c echo.Context) error {
 		overall = "degraded"
 	} else {
 		checks["database"] = "ok"
+	}
+
+	if h.cache != nil {
+		if err := h.cache.Ping(ctx); err != nil {
+			checks["cache"] = "error"
+			overall = "degraded"
+		} else {
+			checks["cache"] = "ok"
+		}
+	} else {
+		checks["cache"] = "disabled"
 	}
 
 	code := http.StatusOK

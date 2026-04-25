@@ -52,3 +52,7 @@ func (r *redisCache) Exists(ctx context.Context, key string) (bool, error) {
 	n, err := r.client.Exists(ctx, key).Result()
 	return n > 0, err
 }
+
+func (r *redisCache) Ping(ctx context.Context) error {
+	return r.client.Ping(ctx).Err()
+}

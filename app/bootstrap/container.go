@@ -58,7 +58,7 @@ func NewContainer(db *sql.DB, cfg *config.Config, log ports.Logger) *Container {
 		HashFn:        hashFn,
 		Cache:         redisCache,
 		HTTPClient:    httpclient.New(cfg),
-		HealthHandler: health.NewHandler(db),
+		HealthHandler: health.NewHandler(db, redisCache),
 		UsersHandler:  usersFeature.NewHandler(usersSvc),
 		PostsHandler:  posts.NewHandler(posts.NewService(httpclient.New(cfg), redisCache)),
 		// scaffold:container-init
