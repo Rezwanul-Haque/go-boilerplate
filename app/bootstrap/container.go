@@ -8,9 +8,12 @@ import (
 
 	"go-boilerplate/app/features/health"
 	usersFeature "go-boilerplate/app/features/users"
+	"go-boilerplate/app/infra/cache"
 	dbUsers "go-boilerplate/app/infra/database/users"
+	"go-boilerplate/app/infra/httpclient"
 	"go-boilerplate/app/infra/notification"
 	"go-boilerplate/app/shared/config"
+	"go-boilerplate/app/shared/ports"
 	"go-boilerplate/app/shared/token"
 	// scaffold:container-imports
 )
@@ -18,14 +21,23 @@ import (
 type Container struct {
 	TokenMaker    token.Maker
 	HashFn        func(ctx context.Context, userID uuid.UUID) (string, error)
+	Cache         ports.Cache
+	HTTPClient    ports.HTTPClient
 	HealthHandler *health.Handler
 	UsersHandler  *usersFeature.Handler
 	// scaffold:container-fields
 }
 
-func NewContainer(db *sql.DB, cfg *config.Config) *Container {
+func NewContainer(db *sql.DB, cfg *config.Config, log ports.Logger) *Container {
 	tokenMaker := token.NewJWTMaker(cfg.JWTSecret)
 	notifier := notification.NewMockNotifier()
+
+	var redisCache ports.Cache
+	if c, err := cache.NewRedisCache(cfg); err != nil {
+		log.Warn("redis unavailable, cache disabled", "error", err.Error())
+	} else {
+		redisCache = c
+	}
 
 	usersRepo := dbUsers.NewPgRepository(db)
 	usersSvc := usersFeature.NewService(usersRepo, usersRepo, notifier, tokenMaker)
@@ -42,6 +54,8 @@ func NewContainer(db *sql.DB, cfg *config.Config) *Container {
 	return &Container{
 		TokenMaker:    tokenMaker,
 		HashFn:        hashFn,
+		Cache:         redisCache,
+		HTTPClient:    httpclient.New(cfg),
 		HealthHandler: health.NewHandler(db),
 		UsersHandler:  usersFeature.NewHandler(usersSvc),
 		// scaffold:container-init

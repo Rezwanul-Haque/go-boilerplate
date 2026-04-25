@@ -40,7 +40,7 @@ func main() {
 		runMigrations(db)
 	}
 
-	c := bootstrap.NewContainer(db, cfg)
+	c := bootstrap.NewContainer(db, cfg, log)
 	e := bootstrap.NewEcho(log)
 	bootstrap.RegisterRoutes(e, c)
 

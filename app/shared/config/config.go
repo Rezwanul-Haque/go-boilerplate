@@ -19,8 +19,12 @@ type Config struct {
 	JWTSecret     string
 	AccessTTL     int
 	RefreshTTL    int
-	LogLevel      string
-	RunMigrations bool
+	LogLevel          string
+	RunMigrations     bool
+	RedisAddr         string
+	RedisPassword     string
+	RedisDB           int
+	HTTPClientTimeout int
 }
 
 func Load() (*Config, error) {
@@ -37,8 +41,12 @@ func Load() (*Config, error) {
 		JWTSecret:  getEnv("JWT_SECRET", "changeme"),
 		AccessTTL:  getEnvInt("JWT_ACCESS_TTL_MINUTES", 15),
 		RefreshTTL: getEnvInt("JWT_REFRESH_TTL_DAYS", 7),
-		LogLevel:      getEnv("LOG_LEVEL", "info"),
-		RunMigrations: getEnvBool("RUN_MIGRATIONS", false),
+		LogLevel:          getEnv("LOG_LEVEL", "info"),
+		RunMigrations:     getEnvBool("RUN_MIGRATIONS", false),
+		RedisAddr:         getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
+		RedisDB:           getEnvInt("REDIS_DB", 0),
+		HTTPClientTimeout: getEnvInt("HTTP_CLIENT_TIMEOUT_SECONDS", 30),
 	}, nil
 }
 
