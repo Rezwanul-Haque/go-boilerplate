@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"go-boilerplate/app/features/health"
+	"go-boilerplate/app/features/posts"
 	usersFeature "go-boilerplate/app/features/users"
 	"go-boilerplate/app/infra/cache"
 	dbUsers "go-boilerplate/app/infra/database/users"
@@ -25,6 +26,7 @@ type Container struct {
 	HTTPClient    ports.HTTPClient
 	HealthHandler *health.Handler
 	UsersHandler  *usersFeature.Handler
+	PostsHandler  *posts.Handler
 	// scaffold:container-fields
 }
 
@@ -58,6 +60,7 @@ func NewContainer(db *sql.DB, cfg *config.Config, log ports.Logger) *Container {
 		HTTPClient:    httpclient.New(cfg),
 		HealthHandler: health.NewHandler(db),
 		UsersHandler:  usersFeature.NewHandler(usersSvc),
+		PostsHandler:  posts.NewHandler(posts.NewService(httpclient.New(cfg), redisCache)),
 		// scaffold:container-init
 	}
 }
