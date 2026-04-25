@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v4"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
@@ -13,6 +15,9 @@ import (
 )
 
 func RegisterRoutes(e *echo.Echo, c *Container) {
+	e.GET("/docs", func(c echo.Context) error {
+		return c.Redirect(http.StatusMovedPermanently, "/docs/index.html")
+	})
 	e.GET("/docs/*", echoSwagger.WrapHandler)
 	e.GET("/health", c.HealthHandler.Check)
 
