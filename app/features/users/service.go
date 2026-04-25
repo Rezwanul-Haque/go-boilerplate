@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"go-boilerplate/app/shared/apperror"
+	"go-boilerplate/app/shared/model"
 	"go-boilerplate/app/shared/ports"
 	"go-boilerplate/app/shared/token"
 )
@@ -55,11 +56,9 @@ func (s *service) Signup(ctx context.Context, req SignupRequest) (*AuthResponse,
 	}
 
 	user := &User{
-		ID:           uuid.New(),
+		Base:         model.Base{ID: uuid.New(), CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		Email:        req.Email,
 		PasswordHash: string(hash),
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
 	}
 
 	if err := s.repo.Create(ctx, user); err != nil {

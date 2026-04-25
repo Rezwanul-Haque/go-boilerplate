@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	usersFeature "go-boilerplate/app/features/users"
+	"go-boilerplate/app/shared/model"
 	"go-boilerplate/app/shared/ports"
 )
 
@@ -39,7 +40,7 @@ func (r *resetTokenRepo) FindByResetToken(ctx context.Context, tok string) (*use
 	if err != nil {
 		return nil, fmt.Errorf("invalid reset token data")
 	}
-	return &usersFeature.User{ID: id}, nil
+	return &usersFeature.User{Base: model.Base{ID: id}}, nil
 }
 
 func (r *resetTokenRepo) ClearResetToken(ctx context.Context, id uuid.UUID) error {

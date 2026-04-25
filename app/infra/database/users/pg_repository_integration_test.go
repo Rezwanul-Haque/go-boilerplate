@@ -18,6 +18,7 @@ import (
 
 	usersFeature "go-boilerplate/app/features/users"
 	dbUsers "go-boilerplate/app/infra/database/users"
+	"go-boilerplate/app/shared/model"
 )
 
 func integrationDSN() string {
@@ -53,10 +54,9 @@ func (s *PgRepositorySuite) SetupTest() {
 func (s *PgRepositorySuite) TestCreate_AndFindByEmail() {
 	ctx := context.Background()
 	user := &usersFeature.User{
+		Base:         model.Base{ID: uuid.New(), CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		Email:        "create@example.com",
 		PasswordHash: "hashedpassword",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
 	}
 
 	err := s.repo.Create(ctx, user)
@@ -71,18 +71,16 @@ func (s *PgRepositorySuite) TestCreate_AndFindByEmail() {
 func (s *PgRepositorySuite) TestCreate_DuplicateEmail_ReturnsError() {
 	ctx := context.Background()
 	user := &usersFeature.User{
+		Base:         model.Base{ID: uuid.New(), CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		Email:        "dup@example.com",
 		PasswordHash: "hash",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
 	}
 
 	require.NoError(s.T(), s.repo.Create(ctx, user))
 	err := s.repo.Create(ctx, &usersFeature.User{
+		Base:         model.Base{ID: uuid.New(), CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		Email:        "dup@example.com",
 		PasswordHash: "hash2",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
 	})
 	assert.Error(s.T(), err)
 }
@@ -100,10 +98,9 @@ func (s *PgRepositorySuite) TestFindByID_NotFound() {
 func (s *PgRepositorySuite) TestUpdatePassword() {
 	ctx := context.Background()
 	user := &usersFeature.User{
+		Base:         model.Base{ID: uuid.New(), CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		Email:        "update@example.com",
 		PasswordHash: "oldhash",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
 	}
 	require.NoError(s.T(), s.repo.Create(ctx, user))
 
@@ -115,33 +112,6 @@ func (s *PgRepositorySuite) TestUpdatePassword() {
 	updated, err := s.repo.FindByID(ctx, found.ID)
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), "newhash", updated.PasswordHash)
-}
-
-func (s *PgRepositorySuite) TestResetToken_SaveFindClear() {
-	ctx := context.Background()
-	user := &usersFeature.User{
-		Email:        "reset@example.com",
-		PasswordHash: "hash",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-	}
-	require.NoError(s.T(), s.repo.Create(ctx, user))
-
-	found, err := s.repo.FindByEmail(ctx, "reset@example.com")
-	require.NoError(s.T(), err)
-
-	expiresAt := time.Now().Add(time.Hour)
-	require.NoError(s.T(), s.repo.SaveResetToken(ctx, found.ID, "myresettoken", expiresAt))
-
-	byToken, err := s.repo.FindByResetToken(ctx, "myresettoken")
-	require.NoError(s.T(), err)
-	assert.Equal(s.T(), found.ID, byToken.ID)
-	assert.NotNil(s.T(), byToken.ResetTokenExpiresAt)
-
-	require.NoError(s.T(), s.repo.ClearResetToken(ctx, found.ID))
-
-	_, err = s.repo.FindByResetToken(ctx, "myresettoken")
-	assert.ErrorIs(s.T(), err, usersFeature.ErrUserNotFound)
 }
 
 func TestPgRepositorySuite(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"go-boilerplate/app/features/users"
+	"go-boilerplate/app/shared/model"
 	"go-boilerplate/app/shared/token"
 )
 
@@ -107,7 +108,7 @@ func (m *mockResetRepo) SaveResetToken(_ context.Context, id uuid.UUID, tok stri
 	if m.saveErr != nil {
 		return m.saveErr
 	}
-	m.tokens[tok] = &users.User{ID: id}
+	m.tokens[tok] = &users.User{Base: model.Base{ID: id}}
 	return nil
 }
 
@@ -174,7 +175,7 @@ func TestSignup_Success(t *testing.T) {
 
 func TestSignup_EmailAlreadyExists(t *testing.T) {
 	repo := newMockUserRepo()
-	repo.byEmail["exists@example.com"] = &users.User{ID: uuid.New(), Email: "exists@example.com"}
+	repo.byEmail["exists@example.com"] = &users.User{Base: model.Base{ID: uuid.New()}, Email: "exists@example.com"}
 	svc := newTestService(repo, newMockResetRepo(), &mockNotifier{})
 
 	_, err := svc.Signup(context.Background(), users.SignupRequest{
@@ -187,7 +188,7 @@ func TestSignup_EmailAlreadyExists(t *testing.T) {
 func TestLogin_Success(t *testing.T) {
 	repo := newMockUserRepo()
 	id := uuid.New()
-	u := &users.User{ID: id, Email: "login@example.com", PasswordHash: hashedPassword(t, "password123")}
+	u := &users.User{Base: model.Base{ID: id}, Email: "login@example.com", PasswordHash: hashedPassword(t, "password123")}
 	repo.byEmail[u.Email] = u
 	repo.byID[id] = u
 	svc := newTestService(repo, newMockResetRepo(), &mockNotifier{})
@@ -203,7 +204,7 @@ func TestLogin_Success(t *testing.T) {
 func TestLogin_WrongPassword(t *testing.T) {
 	repo := newMockUserRepo()
 	id := uuid.New()
-	u := &users.User{ID: id, Email: "login@example.com", PasswordHash: hashedPassword(t, "password123")}
+	u := &users.User{Base: model.Base{ID: id}, Email: "login@example.com", PasswordHash: hashedPassword(t, "password123")}
 	repo.byEmail[u.Email] = u
 	repo.byID[id] = u
 	svc := newTestService(repo, newMockResetRepo(), &mockNotifier{})
@@ -238,7 +239,7 @@ func TestForgotPassword_EmailNotFound_ReturnsNil(t *testing.T) {
 func TestForgotPassword_Success_CallsNotifier(t *testing.T) {
 	repo := newMockUserRepo()
 	id := uuid.New()
-	u := &users.User{ID: id, Email: "forgot@example.com"}
+	u := &users.User{Base: model.Base{ID: id}, Email: "forgot@example.com"}
 	repo.byEmail[u.Email] = u
 	repo.byID[id] = u
 	notifier := &mockNotifier{}
@@ -267,7 +268,7 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 func TestChangePassword_WrongCurrentPassword(t *testing.T) {
 	repo := newMockUserRepo()
 	id := uuid.New()
-	u := &users.User{ID: id, Email: "change@example.com", PasswordHash: hashedPassword(t, "currentpass")}
+	u := &users.User{Base: model.Base{ID: id}, Email: "change@example.com", PasswordHash: hashedPassword(t, "currentpass")}
 	repo.byID[id] = u
 	svc := newTestService(repo, newMockResetRepo(), &mockNotifier{})
 
@@ -282,7 +283,7 @@ func TestListUsers_ReturnsPaginatedResults(t *testing.T) {
 	repo := newMockUserRepo()
 	for i := range 5 {
 		id := uuid.New()
-		u := &users.User{ID: id, Email: fmt.Sprintf("user%d@example.com", i), CreatedAt: time.Now()}
+		u := &users.User{Base: model.Base{ID: id, CreatedAt: time.Now()}, Email: fmt.Sprintf("user%d@example.com", i)}
 		repo.byID[id] = u
 	}
 	svc := newTestService(repo, newMockResetRepo(), &mockNotifier{})
@@ -298,7 +299,7 @@ func TestListUsers_ReturnsPaginatedResults(t *testing.T) {
 func TestListUsersCursor_FirstPage_EmptyCursor(t *testing.T) {
 	repo := newMockUserRepo()
 	id := uuid.New()
-	repo.byID[id] = &users.User{ID: id, Email: "a@example.com", CreatedAt: time.Now()}
+	repo.byID[id] = &users.User{Base: model.Base{ID: id, CreatedAt: time.Now()}, Email: "a@example.com"}
 	svc := newTestService(repo, newMockResetRepo(), &mockNotifier{})
 
 	resp, err := svc.ListUsersCursor(context.Background(), "", 10)
