@@ -9,7 +9,7 @@ import (
 	"go-boilerplate/app/features/health"
 	"go-boilerplate/app/features/posts"
 	usersFeature "go-boilerplate/app/features/users"
-	"go-boilerplate/app/infra/cache"
+	cacheInfra "go-boilerplate/app/infra/cache"
 	dbUsers "go-boilerplate/app/infra/database/users"
 	"go-boilerplate/app/infra/httpclient"
 	"go-boilerplate/app/infra/notification"
@@ -35,14 +35,21 @@ func NewContainer(db *sql.DB, cfg *config.Config, log ports.Logger) *Container {
 	notifier := notification.NewMockNotifier()
 
 	var redisCache ports.Cache
-	if c, err := cache.NewRedisCache(cfg); err != nil {
+	if c, err := cacheInfra.NewRedisCache(cfg); err != nil {
 		log.Warn("redis unavailable, cache disabled", "error", err.Error())
 	} else {
 		redisCache = c
 	}
 
+	var resetRepo usersFeature.PasswordResetRepository
+	if redisCache != nil {
+		resetRepo = cacheInfra.NewResetTokenRepo(redisCache)
+	} else {
+		resetRepo = cacheInfra.NewNoopResetTokenRepo()
+	}
+
 	usersRepo := dbUsers.NewPgRepository(db)
-	usersSvc := usersFeature.NewService(usersRepo, usersRepo, notifier, tokenMaker)
+	usersSvc := usersFeature.NewService(usersRepo, resetRepo, notifier, tokenMaker)
 
 	hashFn := func(ctx context.Context, userID uuid.UUID) (string, error) {
 		user, err := usersRepo.FindByID(ctx, userID)

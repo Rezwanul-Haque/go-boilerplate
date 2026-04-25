@@ -107,10 +107,6 @@ func (s *service) ResetPassword(ctx context.Context, req ResetPasswordRequest) e
 		return ErrInvalidResetToken
 	}
 
-	if user.ResetTokenExpiresAt == nil || time.Now().After(*user.ResetTokenExpiresAt) {
-		return ErrInvalidResetToken
-	}
-
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err

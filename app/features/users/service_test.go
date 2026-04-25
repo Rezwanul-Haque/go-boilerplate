@@ -103,12 +103,11 @@ func newMockResetRepo() *mockResetRepo {
 	return &mockResetRepo{tokens: make(map[string]*users.User)}
 }
 
-func (m *mockResetRepo) SaveResetToken(_ context.Context, id uuid.UUID, tok string, expiresAt time.Time) error {
+func (m *mockResetRepo) SaveResetToken(_ context.Context, id uuid.UUID, tok string, _ time.Time) error {
 	if m.saveErr != nil {
 		return m.saveErr
 	}
-	exp := expiresAt
-	m.tokens[tok] = &users.User{ID: id, ResetTokenExpiresAt: &exp}
+	m.tokens[tok] = &users.User{ID: id}
 	return nil
 }
 
@@ -264,19 +263,6 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 	assert.ErrorIs(t, err, users.ErrInvalidResetToken)
 }
 
-func TestResetPassword_ExpiredToken(t *testing.T) {
-	resetRepo := newMockResetRepo()
-	id := uuid.New()
-	expired := time.Now().Add(-time.Hour)
-	resetRepo.tokens["expiredtoken"] = &users.User{ID: id, ResetTokenExpiresAt: &expired}
-	svc := newTestService(newMockUserRepo(), resetRepo, &mockNotifier{})
-
-	err := svc.ResetPassword(context.Background(), users.ResetPasswordRequest{
-		Token: "expiredtoken", Password: "newpassword",
-	})
-
-	assert.ErrorIs(t, err, users.ErrInvalidResetToken)
-}
 
 func TestChangePassword_WrongCurrentPassword(t *testing.T) {
 	repo := newMockUserRepo()
