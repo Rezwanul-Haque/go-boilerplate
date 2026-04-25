@@ -1,11 +1,14 @@
 package users
 
 import (
+	"strconv"
+
+	"github.com/labstack/echo/v4"
+
 	"go-boilerplate/app/shared/apperror"
 	"go-boilerplate/app/shared/response"
 	"go-boilerplate/app/shared/token"
-
-	"github.com/labstack/echo/v4"
+	"go-boilerplate/app/shared/utils"
 )
 
 type Handler struct {
@@ -96,6 +99,38 @@ func (h *Handler) ChangePassword(c echo.Context) error {
 		return response.Error(c, err)
 	}
 	return response.OK(c, map[string]string{"message": "password changed successfully"})
+}
+
+func (h *Handler) ListUsers(c echo.Context) error {
+	var p utils.Pagination
+	if err := c.Bind(&p); err != nil {
+		return response.Error(c, err)
+	}
+	p.Normalize()
+
+	resp, err := h.svc.ListUsers(c.Request().Context(), p.Page, p.Limit)
+	if err != nil {
+		return response.Error(c, err)
+	}
+	return response.OK(c, resp)
+}
+
+func (h *Handler) ListUsersCursor(c echo.Context) error {
+	limit := 20
+	if l := c.QueryParam("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			if parsed > 100 {
+				parsed = 100
+			}
+			limit = parsed
+		}
+	}
+
+	resp, err := h.svc.ListUsersCursor(c.Request().Context(), c.QueryParam("cursor"), limit)
+	if err != nil {
+		return response.Error(c, err)
+	}
+	return response.OK(c, resp)
 }
 
 func (h *Handler) RefreshToken(c echo.Context) error {

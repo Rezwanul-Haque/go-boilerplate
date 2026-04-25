@@ -38,3 +38,17 @@ type AuthResponse struct {
 	RefreshToken string       `json:"refresh_token"`
 	User         UserResponse `json:"user"`
 }
+
+type OffsetPageResponse struct {
+	Data       []UserResponse `json:"data"`
+	Page       int            `json:"page"`
+	Limit      int            `json:"limit"`
+	Total      int64          `json:"total"`
+	TotalPages int            `json:"total_pages"`
+}
+
+type CursorPageResponse struct {
+	Data       []UserResponse `json:"data"`
+	NextCursor string         `json:"next_cursor,omitempty"`
+	HasMore    bool           `json:"has_more"`
+}

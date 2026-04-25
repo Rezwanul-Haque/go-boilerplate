@@ -12,6 +12,8 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*User, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
 	UpdatePassword(ctx context.Context, id uuid.UUID, hashedPassword string) error
+	List(ctx context.Context, limit, offset int) ([]*User, int64, error)
+	ListAfterCursor(ctx context.Context, cursor time.Time, limit int) ([]*User, error)
 }
 
 type PasswordResetRepository interface {

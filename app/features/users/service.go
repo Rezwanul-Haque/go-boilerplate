@@ -3,12 +3,15 @@ package users
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"go-boilerplate/app/shared/apperror"
 	"go-boilerplate/app/shared/ports"
 	"go-boilerplate/app/shared/token"
 )
@@ -20,6 +23,8 @@ type Service interface {
 	ResetPassword(ctx context.Context, req ResetPasswordRequest) error
 	ChangePassword(ctx context.Context, userID uuid.UUID, req ChangePasswordRequest) error
 	RefreshToken(ctx context.Context, req RefreshTokenRequest) (*AuthResponse, error)
+	ListUsers(ctx context.Context, page, limit int) (*OffsetPageResponse, error)
+	ListUsersCursor(ctx context.Context, cursor string, limit int) (*CursorPageResponse, error)
 }
 
 type service struct {
@@ -174,6 +179,73 @@ func (s *service) buildAuthResponse(user *User) (*AuthResponse, error) {
 		AccessToken:  accessTok,
 		RefreshToken: refreshTok,
 		User:         UserResponse{ID: user.ID.String(), Email: user.Email},
+	}, nil
+}
+
+func (s *service) ListUsers(ctx context.Context, page, limit int) (*OffsetPageResponse, error) {
+	users, total, err := s.repo.List(ctx, limit, (page-1)*limit)
+	if err != nil {
+		return nil, err
+	}
+
+	totalPages := int(total) / limit
+	if int(total)%limit != 0 {
+		totalPages++
+	}
+
+	data := make([]UserResponse, len(users))
+	for i, u := range users {
+		data[i] = UserResponse{ID: u.ID.String(), Email: u.Email}
+	}
+
+	return &OffsetPageResponse{
+		Data:       data,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
+	}, nil
+}
+
+func (s *service) ListUsersCursor(ctx context.Context, cursorStr string, limit int) (*CursorPageResponse, error) {
+	var cursor time.Time
+	if cursorStr != "" {
+		decoded, err := base64.URLEncoding.DecodeString(cursorStr)
+		if err != nil {
+			return nil, apperror.New(http.StatusBadRequest, "invalid cursor")
+		}
+		cursor, err = time.Parse(time.RFC3339Nano, string(decoded))
+		if err != nil {
+			return nil, apperror.New(http.StatusBadRequest, "invalid cursor")
+		}
+	}
+
+	// fetch one extra to detect hasMore
+	users, err := s.repo.ListAfterCursor(ctx, cursor, limit+1)
+	if err != nil {
+		return nil, err
+	}
+
+	hasMore := len(users) > limit
+	if hasMore {
+		users = users[:limit]
+	}
+
+	var nextCursor string
+	if hasMore && len(users) > 0 {
+		last := users[len(users)-1]
+		nextCursor = base64.URLEncoding.EncodeToString([]byte(last.CreatedAt.UTC().Format(time.RFC3339Nano)))
+	}
+
+	data := make([]UserResponse, len(users))
+	for i, u := range users {
+		data[i] = UserResponse{ID: u.ID.String(), Email: u.Email}
+	}
+
+	return &CursorPageResponse{
+		Data:       data,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
 	}, nil
 }
 

@@ -17,4 +17,6 @@ func RegisterRoutes(g *echo.Group, h *Handler, tokenMaker token.Maker, signupLim
 	g.POST("/reset-password", h.ResetPassword)
 	g.POST("/refresh-token", h.RefreshToken)
 	g.PUT("/change-password", h.ChangePassword, middleware.Auth(tokenMaker, hashFn))
+	g.GET("", h.ListUsers)
+	g.GET("/cursor", h.ListUsersCursor)
 }

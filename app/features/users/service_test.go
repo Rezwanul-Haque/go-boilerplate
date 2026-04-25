@@ -3,6 +3,7 @@ package users_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -60,6 +61,35 @@ func (m *mockUserRepo) UpdatePassword(_ context.Context, id uuid.UUID, hash stri
 		u.PasswordHash = hash
 	}
 	return nil
+}
+
+func (m *mockUserRepo) List(_ context.Context, limit, offset int) ([]*users.User, int64, error) {
+	all := make([]*users.User, 0, len(m.byID))
+	for _, u := range m.byID {
+		all = append(all, u)
+	}
+	total := int64(len(all))
+	if offset >= len(all) {
+		return []*users.User{}, total, nil
+	}
+	end := offset + limit
+	if end > len(all) {
+		end = len(all)
+	}
+	return all[offset:end], total, nil
+}
+
+func (m *mockUserRepo) ListAfterCursor(_ context.Context, cursor time.Time, limit int) ([]*users.User, error) {
+	var result []*users.User
+	for _, u := range m.byID {
+		if cursor.IsZero() || u.CreatedAt.Before(cursor) {
+			result = append(result, u)
+		}
+	}
+	if len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
 }
 
 // --- mock PasswordResetRepository ---
@@ -260,6 +290,45 @@ func TestChangePassword_WrongCurrentPassword(t *testing.T) {
 	})
 
 	assert.ErrorIs(t, err, users.ErrWrongPassword)
+}
+
+func TestListUsers_ReturnsPaginatedResults(t *testing.T) {
+	repo := newMockUserRepo()
+	for i := range 5 {
+		id := uuid.New()
+		u := &users.User{ID: id, Email: fmt.Sprintf("user%d@example.com", i), CreatedAt: time.Now()}
+		repo.byID[id] = u
+	}
+	svc := newTestService(repo, newMockResetRepo(), &mockNotifier{})
+
+	resp, err := svc.ListUsers(context.Background(), 1, 3)
+
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(resp.Data), 3)
+	assert.Equal(t, int64(5), resp.Total)
+	assert.Equal(t, 2, resp.TotalPages)
+}
+
+func TestListUsersCursor_FirstPage_EmptyCursor(t *testing.T) {
+	repo := newMockUserRepo()
+	id := uuid.New()
+	repo.byID[id] = &users.User{ID: id, Email: "a@example.com", CreatedAt: time.Now()}
+	svc := newTestService(repo, newMockResetRepo(), &mockNotifier{})
+
+	resp, err := svc.ListUsersCursor(context.Background(), "", 10)
+
+	require.NoError(t, err)
+	assert.Len(t, resp.Data, 1)
+	assert.False(t, resp.HasMore)
+	assert.Empty(t, resp.NextCursor)
+}
+
+func TestListUsersCursor_InvalidCursor_ReturnsError(t *testing.T) {
+	svc := newTestService(newMockUserRepo(), newMockResetRepo(), &mockNotifier{})
+
+	_, err := svc.ListUsersCursor(context.Background(), "notbase64!!", 10)
+
+	assert.Error(t, err)
 }
 
 func TestRefreshToken_InvalidToken(t *testing.T) {

@@ -73,6 +73,61 @@ func (r *pgRepository) ClearResetToken(ctx context.Context, id uuid.UUID) error 
 	return err
 }
 
+func (r *pgRepository) List(ctx context.Context, limit, offset int) ([]*usersFeature.User, int64, error) {
+	var total int64
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	const q = `
+		SELECT id, email, password_hash, reset_token, reset_token_expires_at, created_at, updated_at
+		FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	rows, err := r.db.QueryContext(ctx, q, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	return r.scanRows(rows, total)
+}
+
+func (r *pgRepository) ListAfterCursor(ctx context.Context, cursor time.Time, limit int) ([]*usersFeature.User, error) {
+	var (
+		q    string
+		args []any
+	)
+	if cursor.IsZero() {
+		q = `SELECT id, email, password_hash, reset_token, reset_token_expires_at, created_at, updated_at
+		     FROM users ORDER BY created_at DESC, id DESC LIMIT $1`
+		args = []any{limit}
+	} else {
+		q = `SELECT id, email, password_hash, reset_token, reset_token_expires_at, created_at, updated_at
+		     FROM users WHERE created_at < $1 ORDER BY created_at DESC, id DESC LIMIT $2`
+		args = []any{cursor, limit}
+	}
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users, _, err := r.scanRows(rows, 0)
+	return users, err
+}
+
+func (r *pgRepository) scanRows(rows *sql.Rows, knownTotal int64) ([]*usersFeature.User, int64, error) {
+	var users []*usersFeature.User
+	for rows.Next() {
+		u := &usersFeature.User{}
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.ResetToken, &u.ResetTokenExpiresAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		users = append(users, u)
+	}
+	return users, knownTotal, rows.Err()
+}
+
 func (r *pgRepository) scan(row *sql.Row) (*usersFeature.User, error) {
 	u := &usersFeature.User{}
 	err := row.Scan(

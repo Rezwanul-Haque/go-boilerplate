@@ -52,6 +52,12 @@ func (m *mockService) ChangePassword(_ context.Context, _ uuid.UUID, _ users.Cha
 func (m *mockService) RefreshToken(_ context.Context, _ users.RefreshTokenRequest) (*users.AuthResponse, error) {
 	return m.refreshResp, m.refreshErr
 }
+func (m *mockService) ListUsers(_ context.Context, _, _ int) (*users.OffsetPageResponse, error) {
+	return &users.OffsetPageResponse{}, nil
+}
+func (m *mockService) ListUsersCursor(_ context.Context, _ string, _ int) (*users.CursorPageResponse, error) {
+	return &users.CursorPageResponse{}, nil
+}
 
 // --- test helpers ---
 
