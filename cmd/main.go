@@ -1,3 +1,13 @@
+// @title          Go Boilerplate API
+// @version        1.0
+// @description    Production-ready Go REST API boilerplate with JWT auth, Redis cache, and pagination.
+// @host           localhost:8080
+// @BasePath       /
+// @securityDefinitions.apikey BearerAuth
+// @in             header
+// @name           Authorization
+// @description    Enter: Bearer <token>
+
 package main
 
 import (

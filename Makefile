@@ -1,4 +1,4 @@
-.PHONY: dev dev-down build migrate-up migrate-down test test-unit test-integration lint tidy feature
+.PHONY: dev dev-down build migrate-up migrate-down test test-unit test-integration lint tidy feature swagger
 
 DB_URL=postgres://postgres:postgres@localhost:5432/go_boilerplate?sslmode=disable
 
@@ -36,3 +36,6 @@ tidy:
 feature:
 	@if [ -z "$(name)" ]; then echo "Usage: make feature name=<feature-name>"; exit 1; fi
 	go run ./cmd/scaffold/main.go $(name)
+
+swagger:
+	swag init -g cmd/main.go -o docs/swagger --parseDependency --parseInternal

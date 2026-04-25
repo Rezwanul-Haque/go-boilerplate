@@ -2,8 +2,10 @@ package bootstrap
 
 import (
 	"github.com/labstack/echo/v4"
+	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 
+	_ "go-boilerplate/docs/swagger"
 	"go-boilerplate/app/features/posts"
 	usersFeature "go-boilerplate/app/features/users"
 	"go-boilerplate/app/infra/middleware"
@@ -11,6 +13,7 @@ import (
 )
 
 func RegisterRoutes(e *echo.Echo, c *Container) {
+	e.GET("/docs/*", echoSwagger.WrapHandler)
 	e.GET("/health", c.HealthHandler.Check)
 
 	signupLimiter := middleware.RateLimit(rate.Limit(5.0/60.0), 5)

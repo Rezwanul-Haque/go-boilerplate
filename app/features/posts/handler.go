@@ -19,6 +19,15 @@ func NewHandler(svc Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+// GetPost godoc
+// @Summary     Get post by ID
+// @Tags        posts
+// @Produce     json
+// @Param       id path int true "Post ID"
+// @Success     200 {object} response.Response{data=Post}
+// @Failure     400 {object} response.Response
+// @Failure     404 {object} response.Response
+// @Router      /api/v1/posts/{id} [get]
 func (h *Handler) GetPost(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id < 1 {

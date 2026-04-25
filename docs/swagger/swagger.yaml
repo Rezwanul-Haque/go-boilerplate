@@ -1,0 +1,448 @@
+basePath: /
+definitions:
+  app_features_health.Status:
+    properties:
+      checks:
+        additionalProperties:
+          type: string
+        type: object
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  app_features_posts.Post:
+    properties:
+      body:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      userId:
+        type: integer
+    type: object
+  app_features_users.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      user:
+        $ref: '#/definitions/app_features_users.UserResponse'
+    type: object
+  app_features_users.ChangePasswordRequest:
+    properties:
+      current_password:
+        type: string
+      new_password:
+        minLength: 8
+        type: string
+    required:
+    - current_password
+    - new_password
+    type: object
+  app_features_users.CursorPageResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/app_features_users.UserResponse'
+        type: array
+      has_more:
+        type: boolean
+      next_cursor:
+        type: string
+    type: object
+  app_features_users.ForgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  app_features_users.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  app_features_users.OffsetPageResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/app_features_users.UserResponse'
+        type: array
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  app_features_users.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  app_features_users.ResetPasswordRequest:
+    properties:
+      password:
+        minLength: 8
+        type: string
+      token:
+        type: string
+    required:
+    - password
+    - token
+    type: object
+  app_features_users.SignupRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  app_features_users.UserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+    type: object
+  go-boilerplate_app_shared_response.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+      success:
+        type: boolean
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Production-ready Go REST API boilerplate with JWT auth, Redis cache,
+    and pagination.
+  title: Go Boilerplate API
+  version: "1.0"
+paths:
+  /api/v1/posts/{id}:
+    get:
+      parameters:
+      - description: Post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/app_features_posts.Post'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: Get post by ID
+      tags:
+      - posts
+  /api/v1/users:
+    get:
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/app_features_users.OffsetPageResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: List users (offset pagination)
+      tags:
+      - users
+  /api/v1/users/change-password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Change password request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_features_users.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      security:
+      - BearerAuth: []
+      summary: Change password
+      tags:
+      - users
+  /api/v1/users/cursor:
+    get:
+      parameters:
+      - description: Cursor (base64-encoded RFC3339Nano timestamp)
+        in: query
+        name: cursor
+        type: string
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/app_features_users.CursorPageResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: List users (cursor pagination)
+      tags:
+      - users
+  /api/v1/users/forgot-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Forgot password request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_features_users.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: Forgot password
+      tags:
+      - auth
+  /api/v1/users/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_features_users.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/app_features_users.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: Login
+      tags:
+      - auth
+  /api/v1/users/refresh-token:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_features_users.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/app_features_users.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: Refresh access token
+      tags:
+      - auth
+  /api/v1/users/reset-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Reset password request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_features_users.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: Reset password
+      tags:
+      - auth
+  /api/v1/users/signup:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Signup request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_features_users.SignupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/app_features_users.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: Sign up
+      tags:
+      - auth
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/app_features_health.Status'
+              type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/go-boilerplate_app_shared_response.Response'
+      summary: Health check
+      tags:
+      - health
+securityDefinitions:
+  BearerAuth:
+    description: 'Enter: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
