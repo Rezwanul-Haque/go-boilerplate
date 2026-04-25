@@ -30,23 +30,10 @@ type Container struct {
 	// scaffold:container-fields
 }
 
-func NewContainer(db *sql.DB, cfg *config.Config, log ports.Logger) *Container {
+func NewContainer(db *sql.DB, cfg *config.Config, log ports.Logger, redisCache ports.Cache) *Container {
 	tokenMaker := token.NewJWTMaker(cfg.JWTSecret)
 	notifier := notification.NewMockNotifier()
-
-	var redisCache ports.Cache
-	if c, err := cacheInfra.NewRedisCache(cfg); err != nil {
-		log.Warn("redis unavailable, cache disabled", "error", err.Error())
-	} else {
-		redisCache = c
-	}
-
-	var resetRepo usersFeature.PasswordResetRepository
-	if redisCache != nil {
-		resetRepo = cacheInfra.NewResetTokenRepo(redisCache)
-	} else {
-		resetRepo = cacheInfra.NewNoopResetTokenRepo()
-	}
+	resetRepo := cacheInfra.NewResetTokenRepo(redisCache)
 
 	usersRepo := dbUsers.NewPgRepository(db)
 	usersSvc := usersFeature.NewService(usersRepo, resetRepo, notifier, tokenMaker)

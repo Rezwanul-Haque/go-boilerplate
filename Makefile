@@ -3,6 +3,7 @@
 DB_URL=postgres://postgres:postgres@localhost:5432/go_boilerplate?sslmode=disable
 
 dev:
+	@[ -f .env ] || (cp .env.example .env && echo "Created .env from .env.example")
 	docker-compose up --build
 
 dev-down:

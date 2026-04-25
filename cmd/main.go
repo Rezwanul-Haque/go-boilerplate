@@ -25,6 +25,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"go-boilerplate/app/bootstrap"
+	"go-boilerplate/app/infra/cache"
 	"go-boilerplate/app/infra/database"
 	"go-boilerplate/app/infra/logger"
 	"go-boilerplate/app/shared/config"
@@ -46,11 +47,17 @@ func main() {
 	}
 	defer db.Close()
 
+	redisCache, err := cache.NewRedisCache(cfg)
+	if err != nil {
+		log.Error("failed to connect to redis", err)
+		os.Exit(1)
+	}
+
 	if cfg.RunMigrations {
 		runMigrations(db)
 	}
 
-	c := bootstrap.NewContainer(db, cfg, log)
+	c := bootstrap.NewContainer(db, cfg, log, redisCache)
 	e := bootstrap.NewEcho(log)
 	bootstrap.RegisterRoutes(e, c)
 
