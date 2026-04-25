@@ -38,4 +38,4 @@ feature:
 	go run ./cmd/scaffold/main.go $(name)
 
 swagger:
-	swag init -g cmd/main.go -o docs/swagger --parseDependency --parseInternal
+	go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/main.go -o docs/swagger --parseDependency --parseInternal
