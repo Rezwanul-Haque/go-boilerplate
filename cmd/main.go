@@ -28,6 +28,8 @@ import (
 	"go-boilerplate/app/infra/cache"
 	"go-boilerplate/app/infra/database"
 	"go-boilerplate/app/infra/logger"
+	"go-boilerplate/app/infra/notification"
+	"go-boilerplate/app/infra/queue"
 	"go-boilerplate/app/shared/config"
 )
 
@@ -61,31 +63,40 @@ func main() {
 	e := bootstrap.NewEcho(log)
 	bootstrap.RegisterRoutes(e, c)
 
+	notifier := notification.NewMockNotifier()
+	queueServer := queue.NewServer(cfg.RedisAddr, cfg.RedisPassword, cfg.QueueDB, cfg.QueueConcurrency)
+	queueServer.RegisterHandlers(notifier)
+
 	addr := fmt.Sprintf(":%s", cfg.AppPort)
 	log.Info("server starting", "addr", addr)
+
 	go func() {
 		if err := e.Start(addr); err != nil {
 			log.Info("server stopped")
 		}
 	}()
 
-	gracefulShutdown(e, log)
-}
+	go func() {
+		if err := queueServer.Start(); err != nil {
+			log.Error("queue worker stopped", err)
+		}
+	}()
 
-func gracefulShutdown(e interface {
-	Shutdown(ctx context.Context) error
-}, log interface {
-	Error(msg string, err error, fields ...any)
-}) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
+	log.Info("shutting down")
+	queueServer.Stop()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
 	if err := e.Shutdown(ctx); err != nil {
 		log.Error("server shutdown error", err)
+	}
+
+	if err := c.QueueClient.Close(); err != nil {
+		log.Error("queue client close error", err)
 	}
 }
 

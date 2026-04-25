@@ -13,6 +13,7 @@ import (
 	dbUsers "go-boilerplate/app/infra/database/users"
 	"go-boilerplate/app/infra/httpclient"
 	"go-boilerplate/app/infra/notification"
+	"go-boilerplate/app/infra/queue"
 	"go-boilerplate/app/shared/config"
 	"go-boilerplate/app/shared/ports"
 	"go-boilerplate/app/shared/token"
@@ -24,6 +25,7 @@ type Container struct {
 	HashFn        func(ctx context.Context, userID uuid.UUID) (string, error)
 	Cache         ports.Cache
 	HTTPClient    ports.HTTPClient
+	QueueClient   ports.QueueClient
 	HealthHandler *health.Handler
 	UsersHandler  *usersFeature.Handler
 	PostsHandler  *posts.Handler
@@ -46,12 +48,15 @@ func NewContainer(db *sql.DB, cfg *config.Config, log ports.Logger, redisCache p
 		return user.PasswordHash, nil
 	}
 
+	queueClient := queue.NewClient(cfg.RedisAddr, cfg.RedisPassword, cfg.QueueDB)
+
 	// scaffold:container-wire
 	return &Container{
 		TokenMaker:    tokenMaker,
 		HashFn:        hashFn,
 		Cache:         redisCache,
 		HTTPClient:    httpclient.New(cfg),
+		QueueClient:   queueClient,
 		HealthHandler: health.NewHandler(db, redisCache),
 		UsersHandler:  usersFeature.NewHandler(usersSvc),
 		PostsHandler:  posts.NewHandler(posts.NewService(httpclient.New(cfg), redisCache)),

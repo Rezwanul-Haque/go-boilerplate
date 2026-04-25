@@ -25,6 +25,8 @@ type Config struct {
 	RedisPassword     string
 	RedisDB           int
 	HTTPClientTimeout int
+	QueueConcurrency  int
+	QueueDB           int
 }
 
 func Load() (*Config, error) {
@@ -47,6 +49,8 @@ func Load() (*Config, error) {
 		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
 		RedisDB:           getEnvInt("REDIS_DB", 0),
 		HTTPClientTimeout: getEnvInt("HTTP_CLIENT_TIMEOUT_SECONDS", 30),
+		QueueConcurrency:  getEnvInt("QUEUE_CONCURRENCY", 10),
+		QueueDB:           getEnvInt("QUEUE_DB", 1),
 	}, nil
 }
 
