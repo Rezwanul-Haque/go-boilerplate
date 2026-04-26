@@ -56,3 +56,7 @@ func (r *redisCache) Exists(ctx context.Context, key string) (bool, error) {
 func (r *redisCache) Ping(ctx context.Context) error {
 	return r.client.Ping(ctx).Err()
 }
+
+func (r *redisCache) Incr(ctx context.Context, key string) (int64, error) {
+	return r.client.Incr(ctx, key).Result()
+}

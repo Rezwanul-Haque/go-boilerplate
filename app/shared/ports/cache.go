@@ -14,4 +14,5 @@ type Cache interface {
 	Delete(ctx context.Context, key string) error
 	Exists(ctx context.Context, key string) (bool, error)
 	Ping(ctx context.Context) error
+	Incr(ctx context.Context, key string) (int64, error)
 }
