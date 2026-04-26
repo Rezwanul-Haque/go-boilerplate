@@ -275,7 +275,7 @@ func selectorToSQL(pkg, sel string) string {
 func generateUpSQL(table string, fields []fieldDef) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n", table))
-	sb.WriteString("    id         UUID PRIMARY KEY,\n")
+	sb.WriteString("    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n")
 	for _, f := range fields {
 		null := " NOT NULL"
 		if f.Nullable {
