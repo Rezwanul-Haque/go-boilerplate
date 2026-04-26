@@ -8,8 +8,10 @@ import (
 
 	"go-boilerplate/app/features/health"
 	"go-boilerplate/app/features/posts"
+	tinyurlFeature "go-boilerplate/app/features/tinyurl"
 	usersFeature "go-boilerplate/app/features/users"
 	cacheInfra "go-boilerplate/app/infra/cache"
+	dbTinyurl "go-boilerplate/app/infra/database/tinyurl"
 	dbUsers "go-boilerplate/app/infra/database/users"
 	"go-boilerplate/app/infra/httpclient"
 	"go-boilerplate/app/infra/notification"
@@ -21,14 +23,15 @@ import (
 )
 
 type Container struct {
-	TokenMaker    token.Maker
-	HashFn        func(ctx context.Context, userID uuid.UUID) (string, error)
-	Cache         ports.Cache
-	HTTPClient    ports.HTTPClient
-	QueueClient   ports.QueueClient
-	HealthHandler *health.Handler
-	UsersHandler  *usersFeature.Handler
-	PostsHandler  *posts.Handler
+	TokenMaker     token.Maker
+	HashFn         func(ctx context.Context, userID uuid.UUID) (string, error)
+	Cache          ports.Cache
+	HTTPClient     ports.HTTPClient
+	QueueClient    ports.QueueClient
+	HealthHandler  *health.Handler
+	UsersHandler   *usersFeature.Handler
+	PostsHandler   *posts.Handler
+	TinyurlHandler *tinyurlFeature.Handler
 	// scaffold:container-fields
 }
 
@@ -50,16 +53,20 @@ func NewContainer(db *sql.DB, cfg *config.Config, log ports.Logger, redisCache p
 
 	queueClient := queue.NewClient(cfg.RedisAddr, cfg.RedisPassword, cfg.QueueDB)
 
+	tinyurlRepo := dbTinyurl.NewPgRepository(db)
+	tinyurlSvc := tinyurlFeature.NewService(tinyurlRepo, redisCache)
+	tinyurlHandler := tinyurlFeature.NewHandler(tinyurlSvc)
 	// scaffold:container-wire
 	return &Container{
-		TokenMaker:    tokenMaker,
-		HashFn:        hashFn,
-		Cache:         redisCache,
-		HTTPClient:    httpclient.New(cfg),
-		QueueClient:   queueClient,
-		HealthHandler: health.NewHandler(db, redisCache),
-		UsersHandler:  usersFeature.NewHandler(usersSvc),
-		PostsHandler:  posts.NewHandler(posts.NewService(httpclient.New(cfg), redisCache)),
+		TokenMaker:     tokenMaker,
+		HashFn:         hashFn,
+		Cache:          redisCache,
+		HTTPClient:     httpclient.New(cfg),
+		QueueClient:    queueClient,
+		HealthHandler:  health.NewHandler(db, redisCache),
+		UsersHandler:   usersFeature.NewHandler(usersSvc),
+		PostsHandler:   posts.NewHandler(posts.NewService(httpclient.New(cfg), redisCache)),
+		TinyurlHandler: tinyurlHandler,
 		// scaffold:container-init
 	}
 }
