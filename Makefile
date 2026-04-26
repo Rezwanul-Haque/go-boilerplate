@@ -1,10 +1,8 @@
-.PHONY: dev dev-down build migrations up down test test-unit test-integration lint tidy feature rm swagger
-
-DB_URL=postgres://postgres:postgres@localhost:5432/go_boilerplate?sslmode=disable
+.PHONY: dev dev-down build migrations up down test test-unit test-integration lint tidy feature rm rename swagger
 
 dev:
 	@[ -f .env ] || (cp .env.example .env && echo "Created .env from .env.example")
-	docker-compose up --build
+	docker-compose up -d --build
 
 dev-down:
 	docker-compose down
@@ -14,9 +12,9 @@ build:
 
 migrations:
 	@if echo "$(MAKECMDGOALS)" | grep -qw "up"; then \
-		migrate -path app/infra/database/migrations -database "$(DB_URL)" up; \
+		go run ./cmd/scaffold/migrate/main.go up; \
 	elif echo "$(MAKECMDGOALS)" | grep -qw "down"; then \
-		migrate -path app/infra/database/migrations -database "$(DB_URL)" down; \
+		go run ./cmd/scaffold/migrate/main.go down; \
 	elif [ -n "$(name)" ]; then \
 		go run ./cmd/scaffold/migrate/main.go $(name); \
 	else \
@@ -27,8 +25,12 @@ migrations:
 		exit 1; \
 	fi
 
-up: ;
-down: ;
+up:
+	@:
+
+down:
+	@:
+
 
 test: test-unit
 
@@ -54,7 +56,12 @@ feature:
 		go run ./cmd/scaffold/main.go $(name); \
 	fi
 
-rm: ;
+rm:
+	@:
+
+rename:
+	@if [ -z "$(name)" ]; then echo "Usage: make rename name=<new-project-name>"; exit 1; fi
+	go run ./cmd/scaffold/rename/main.go $(name)
 
 swagger:
 	go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/main.go -o docs/swagger --parseDependency --parseInternal

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -12,15 +13,108 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: make migrations name=<feature-name>")
+		fmt.Fprintln(os.Stderr, "       make migrations up")
+		fmt.Fprintln(os.Stderr, "       make migrations down")
 		os.Exit(1)
 	}
 
-	name := strings.ToLower(strings.TrimSpace(os.Args[1]))
+	switch os.Args[1] {
+	case "up":
+		runMigrations(true)
+	case "down":
+		runMigrations(false)
+	default:
+		generateMigration(os.Args[1])
+	}
+}
+
+func runMigrations(up bool) {
+	dbURL := buildDBURL()
+	migrationsDir := "file://app/infra/database/migrations"
+
+	m, err := migrate.New(migrationsDir, dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error initializing migrate: %v\n", err)
+		os.Exit(1)
+	}
+	defer m.Close()
+
+	versionBefore, _, _ := m.Version()
+
+	if up {
+		err = m.Up()
+	} else {
+		err = m.Steps(-1)
+	}
+
+	if err == migrate.ErrNoChange {
+		fmt.Println("  no changes to apply.")
+		return
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "migration error: %v\n", err)
+		os.Exit(1)
+	}
+
+	versionAfter, _, _ := m.Version()
+
+	if up {
+		fmt.Printf("✓ Migrations applied. version: %d → %d\n", versionBefore, versionAfter)
+	} else {
+		fmt.Printf("✓ Rolled back migration %d → version now: %d\n", versionBefore, versionAfter)
+	}
+}
+
+func buildDBURL() string {
+	env := loadEnv(".env")
+	host := envOr(env, "DB_HOST", "localhost")
+	port := envOr(env, "DB_PORT", "5432")
+	user := envOr(env, "DB_USER", "postgres")
+	pass := envOr(env, "DB_PASSWORD", "postgres")
+	name := envOr(env, "DB_NAME", "go_boilerplate")
+	ssl := envOr(env, "DB_SSL_MODE", "disable")
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, pass, host, port, name, ssl)
+}
+
+func loadEnv(path string) map[string]string {
+	env := map[string]string{}
+	f, err := os.Open(path)
+	if err != nil {
+		return env
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			env[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+	return env
+}
+
+func envOr(env map[string]string, key, fallback string) string {
+	if v, ok := env[key]; ok && v != "" {
+		return v
+	}
+	return fallback
+}
+
+func generateMigration(name string) {
+	name = strings.ToLower(strings.TrimSpace(name))
 	if name == "" {
 		fmt.Fprintln(os.Stderr, "feature name cannot be empty")
 		os.Exit(1)
@@ -57,7 +151,7 @@ func main() {
 	}
 	fmt.Printf("  created  %s\n", downPath)
 
-	fmt.Printf("\n✓ Migration for '%s' generated. Review and edit before running make migrate-up.\n", name)
+	fmt.Printf("\n✓ Migration for '%s' generated. Review and edit before running make migrations up.\n", name)
 }
 
 type fieldDef struct {

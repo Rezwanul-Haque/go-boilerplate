@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -102,6 +103,14 @@ func removeFeature(data featureData) {
 	dbDir := filepath.Join("app", "infra", "database", data.Name)
 	migrationsDir := filepath.Join("app", "infra", "database", "migrations")
 
+	// roll back DB before deleting files so golang-migrate can find them
+	if err := exec.Command("go", "run", "./cmd/scaffold/migrate/main.go", "down").Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: migrate down failed (table may not exist or DB unreachable): %v\n", err)
+		fmt.Fprintln(os.Stderr, "  continuing with file removal...")
+	} else {
+		fmt.Println("  migrated down")
+	}
+
 	if err := os.RemoveAll(featureDir); err != nil {
 		fmt.Fprintf(os.Stderr, "error removing %s: %v\n", featureDir, err)
 		os.Exit(1)
@@ -129,7 +138,6 @@ func removeFeature(data featureData) {
 	fmt.Println("  updated  app/bootstrap/routes.go")
 
 	fmt.Printf("\n✓ Feature '%s' removed.\n", data.Name)
-	fmt.Println("  note: run 'make migrate-down' before removing if table exists in DB.")
 }
 
 func removeMigrationFiles(dir, name string) {
