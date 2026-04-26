@@ -18,12 +18,23 @@ type featureData struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: scaffold <feature-name>")
-		fmt.Fprintln(os.Stderr, "example: make feature name=products")
+		fmt.Fprintln(os.Stderr, "usage: make feature name=<feature-name>")
+		fmt.Fprintln(os.Stderr, "       make feature rm name=<feature-name>")
 		os.Exit(1)
 	}
 
-	name := strings.ToLower(strings.TrimSpace(os.Args[1]))
+	subCmd := "create"
+	nameArg := os.Args[1]
+	if os.Args[1] == "rm" || os.Args[1] == "create" {
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "feature name required")
+			os.Exit(1)
+		}
+		subCmd = os.Args[1]
+		nameArg = os.Args[2]
+	}
+
+	name := strings.ToLower(strings.TrimSpace(nameArg))
 	if name == "" {
 		fmt.Fprintln(os.Stderr, "feature name cannot be empty")
 		os.Exit(1)
@@ -34,6 +45,11 @@ func main() {
 		NameTitle:  title(name),
 		NameSingle: singular(title(name)),
 		PkgDB:      name + "db",
+	}
+
+	if subCmd == "rm" {
+		removeFeature(data)
+		return
 	}
 
 	featureDir := filepath.Join("app", "features", name)
@@ -75,10 +91,104 @@ func main() {
 
 	fmt.Printf("\n✓ Feature '%s' scaffolded and wired successfully.\n\n", name)
 	fmt.Println("Next steps:")
-	fmt.Printf("  1. Add migration:  app/infra/database/migrations/XXXXXX_create_%s.up.sql\n", name)
-	fmt.Printf("  2. Fill model:     app/features/%s/model.go\n", name)
-	fmt.Printf("  3. Fill DTOs:      app/features/%s/dto.go\n", name)
+	fmt.Printf("  1. Fill model:     app/features/%s/model.go\n", name)
+	fmt.Printf("  2. Fill DTOs:      app/features/%s/dto.go\n", name)
+	fmt.Printf("  3. Run migration:  make migrations name=%s\n", name)
 	fmt.Printf("  4. Fill repo:      app/infra/database/%s/pg_repository.go\n", name)
+}
+
+func removeFeature(data featureData) {
+	featureDir := filepath.Join("app", "features", data.Name)
+	dbDir := filepath.Join("app", "infra", "database", data.Name)
+	migrationsDir := filepath.Join("app", "infra", "database", "migrations")
+
+	if err := os.RemoveAll(featureDir); err != nil {
+		fmt.Fprintf(os.Stderr, "error removing %s: %v\n", featureDir, err)
+		os.Exit(1)
+	}
+	fmt.Printf("  removed  %s\n", featureDir)
+
+	if err := os.RemoveAll(dbDir); err != nil {
+		fmt.Fprintf(os.Stderr, "error removing %s: %v\n", dbDir, err)
+		os.Exit(1)
+	}
+	fmt.Printf("  removed  %s\n", dbDir)
+
+	removeMigrationFiles(migrationsDir, data.Name)
+
+	if err := removeFromContainer(data); err != nil {
+		fmt.Fprintf(os.Stderr, "error updating app/bootstrap/container.go: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("  updated  app/bootstrap/container.go")
+
+	if err := removeFromBootstrapRoutes(data); err != nil {
+		fmt.Fprintf(os.Stderr, "error updating app/bootstrap/routes.go: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("  updated  app/bootstrap/routes.go")
+
+	fmt.Printf("\n✓ Feature '%s' removed.\n", data.Name)
+	fmt.Println("  note: run 'make migrate-down' before removing if table exists in DB.")
+}
+
+func removeMigrationFiles(dir, name string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	pattern := "_create_" + name + "."
+	for _, e := range entries {
+		if strings.Contains(e.Name(), pattern) {
+			path := filepath.Join(dir, e.Name())
+			if err := os.Remove(path); err != nil {
+				fmt.Fprintf(os.Stderr, "  warning: could not remove %s: %v\n", path, err)
+				continue
+			}
+			fmt.Printf("  removed  %s\n", path)
+		}
+	}
+}
+
+func removeFromContainer(data featureData) error {
+	return modifyFile("app/bootstrap/container.go", func(content string) (string, error) {
+		tokens := []string{
+			data.Name + "Feature",
+			"db" + data.NameTitle,
+			data.NameTitle + "Handler",
+			data.Name + "Repo",
+			data.Name + "Svc",
+			data.Name + "Handler",
+		}
+		return removeLines(content, tokens...), nil
+	})
+}
+
+func removeFromBootstrapRoutes(data featureData) error {
+	return modifyFile("app/bootstrap/routes.go", func(content string) (string, error) {
+		tokens := []string{
+			data.Name + "Feature",
+		}
+		return removeLines(content, tokens...), nil
+	})
+}
+
+func removeLines(content string, tokens ...string) string {
+	lines := strings.Split(content, "\n")
+	out := lines[:0]
+	for _, line := range lines {
+		keep := true
+		for _, tok := range tokens {
+			if strings.Contains(line, tok) {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			out = append(out, line)
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-.PHONY: dev dev-down build migrate-up migrate-down test test-unit test-integration lint tidy feature swagger
+.PHONY: dev dev-down build migrations up down test test-unit test-integration lint tidy feature rm swagger
 
 DB_URL=postgres://postgres:postgres@localhost:5432/go_boilerplate?sslmode=disable
 
@@ -12,11 +12,23 @@ dev-down:
 build:
 	go build -o bin/server ./cmd/main.go
 
-migrate-up:
-	migrate -path app/infra/database/migrations -database "$(DB_URL)" up
+migrations:
+	@if echo "$(MAKECMDGOALS)" | grep -qw "up"; then \
+		migrate -path app/infra/database/migrations -database "$(DB_URL)" up; \
+	elif echo "$(MAKECMDGOALS)" | grep -qw "down"; then \
+		migrate -path app/infra/database/migrations -database "$(DB_URL)" down; \
+	elif [ -n "$(name)" ]; then \
+		go run ./cmd/scaffold/migrate/main.go $(name); \
+	else \
+		echo "Usage:"; \
+		echo "  make migrations name=<feature>   generate migration files"; \
+		echo "  make migrations up               apply all pending migrations"; \
+		echo "  make migrations down             roll back last migration"; \
+		exit 1; \
+	fi
 
-migrate-down:
-	migrate -path app/infra/database/migrations -database "$(DB_URL)" down
+up: ;
+down: ;
 
 test: test-unit
 
@@ -35,8 +47,14 @@ tidy:
 	go mod tidy
 
 feature:
-	@if [ -z "$(name)" ]; then echo "Usage: make feature name=<feature-name>"; exit 1; fi
-	go run ./cmd/scaffold/main.go $(name)
+	@if [ -z "$(name)" ]; then echo "Usage: make feature [rm] name=<feature-name>"; exit 1; fi
+	@if echo "$(MAKECMDGOALS)" | grep -qw "rm"; then \
+		go run ./cmd/scaffold/main.go rm $(name); \
+	else \
+		go run ./cmd/scaffold/main.go $(name); \
+	fi
+
+rm: ;
 
 swagger:
 	go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/main.go -o docs/swagger --parseDependency --parseInternal
