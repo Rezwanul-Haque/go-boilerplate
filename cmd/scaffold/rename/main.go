@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 func main() {
@@ -32,7 +33,12 @@ func main() {
 		return
 	}
 
-	fmt.Printf("renaming %q → %q\n\n", oldName, newName)
+	// e.g. "go-boilerplate" → "Go Boilerplate", "my-api" → "My Api"
+	oldTitle := toTitle(oldName)
+	newTitle := toTitle(newName)
+
+	fmt.Printf("renaming %q → %q\n", oldName, newName)
+	fmt.Printf("title:   %q → %q\n\n", oldTitle, newTitle)
 
 	changed := 0
 	err = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
@@ -45,7 +51,7 @@ func main() {
 		if !shouldProcess(path) {
 			return nil
 		}
-		if replaced, rerr := replaceInFile(path, oldName, newName); rerr != nil {
+		if replaced, rerr := replaceInFile(path, oldName, newName, oldTitle, newTitle); rerr != nil {
 			fmt.Fprintf(os.Stderr, "  warning: %s: %v\n", path, rerr)
 		} else if replaced {
 			fmt.Printf("  updated  %s\n", path)
@@ -59,6 +65,7 @@ func main() {
 	}
 
 	fmt.Printf("\n✓ Done. %d file(s) updated.\n", changed)
+	fmt.Println("  run 'make swagger' to regenerate swagger docs.")
 }
 
 func readModuleName(path string) (string, error) {
@@ -77,16 +84,34 @@ func readModuleName(path string) (string, error) {
 	return "", fmt.Errorf("module declaration not found in %s", path)
 }
 
-func replaceInFile(path, oldName, newName string) (bool, error) {
+func replaceInFile(path, oldName, newName, oldTitle, newTitle string) (bool, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return false, err
 	}
-	if !bytes.Contains(data, []byte(oldName)) {
+	// replace title first (more specific), then module name
+	updated := bytes.ReplaceAll(data, []byte(oldTitle), []byte(newTitle))
+	updated = bytes.ReplaceAll(updated, []byte(oldName), []byte(newName))
+	if bytes.Equal(data, updated) {
 		return false, nil
 	}
-	updated := bytes.ReplaceAll(data, []byte(oldName), []byte(newName))
 	return true, os.WriteFile(path, updated, 0644)
+}
+
+// toTitle converts "go-boilerplate" → "Go Boilerplate"
+func toTitle(s string) string {
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '-' || r == '_'
+	})
+	for i, p := range parts {
+		if len(p) == 0 {
+			continue
+		}
+		runes := []rune(p)
+		runes[0] = unicode.ToUpper(runes[0])
+		parts[i] = string(runes)
+	}
+	return strings.Join(parts, " ")
 }
 
 func shouldSkipDir(name string) bool {
